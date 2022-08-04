@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -eux
+set -eu
 
 datadir=/scratch/snx3000/juckerj/WG_1_tasks/ecrad/models
 exedir=/scratch/snx3000/juckerj/WG_1_tasks/ecrad/infero/ecrad
