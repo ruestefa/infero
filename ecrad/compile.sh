@@ -11,4 +11,5 @@ FCFLAGS="-cpp -Wall -pedantic -fbacktrace -O2 -g -ffree-line-length-256 -I${NETC
 LDFLAGS="-L${INFERO_ROOT}/lib -L${NETCDF_DIR}/lib"
 
 #ftn -o toy_model.exe $FCFLAGS $LDFLAGS $LIBS toy_model.f90
-ftn -o real_model.exe $FCFLAGS $LDFLAGS $LIBS real_model.f90
+#ftn -o real_model.exe $FCFLAGS $LDFLAGS $LIBS real_model.f90
+ftn -o multiple_fields_model.exe $FCFLAGS $LDFLAGS $LIBS multiple_fields_model.f90 
