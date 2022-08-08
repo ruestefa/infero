@@ -21,10 +21,12 @@ program my_program
   ! model of infero model
   type(infero_model) :: model_sw,model_lw
 
+  integer,parameter :: batch_size = 1000
+
   ! input and output tensors
-  real(c_float) :: input_3d(1,60,4,6)
-  real(c_float) :: input_2d(1,4,8)
-  real(c_float) :: pred_swflx(1,60,2), pred_lwflx(1,60,2)
+  real(c_float) :: input_3d(batch_size,60,4,6)
+  real(c_float) :: input_2d(batch_size,4,8)
+  real(c_float) :: pred_swflx(batch_size,60,2), pred_lwflx(batch_size,60,2)
   type(infero_tensor_set) :: iset
   type(infero_tensor_set) :: oset_lw, oset_sw
 
@@ -34,7 +36,7 @@ program my_program
   integer :: dim_len(6),grid_dim_len(14)
 
   ! indices from notebook
-  integer :: step, idx,n_step
+  integer :: step, idx,n_step, s_idx,e_idx
 
   real(c_float), allocatable :: from_netcdf_3d(:,:,:,:), from_netcdf_2d(:,:,:), neighbor_cell_index(:,:)
   real(c_float), allocatable :: swflx(:,:,:,:), lwflx(:,:,:,:)
@@ -68,11 +70,11 @@ program my_program
   call infero_check(oset_lw%initialise())
   call infero_check(oset_sw%initialise())
 
-  n_step = 96
+  n_step = 12
   idx=1235
 
-  ALLOCATE(swflx(1,60,2,n_step))
-  ALLOCATE(lwflx(1,60,2,n_step))
+  ALLOCATE(swflx(batch_size,60,2,n_step))
+  ALLOCATE(lwflx(batch_size,60,2,n_step))
 
   
   ! strange behaviour with init to 0 -> all values stay 0 even after infer
@@ -154,16 +156,18 @@ program my_program
   ! SW
   call infero_check(oset_sw%push_tensor(pred_swflx, "StatefulPartitionedCall"))
 
+  s_idx = idx
+  e_idx = idx + batch_size
   DO step=1,n_step
-    input_2d(1,1,:) = from_netcdf_2d(idx,step,:)
-    input_2d(1,2,:) = from_netcdf_2d(INT(neighbor_cell_index(idx,1)),step,:)
-    input_2d(1,3,:) = from_netcdf_2d(INT(neighbor_cell_index(idx,2)),step,:)
-    input_2d(1,4,:) = from_netcdf_2d(INT(neighbor_cell_index(idx,3)),step,:)
+    input_2d(:,1,:) = from_netcdf_2d(s_idx:e_idx,step,:)
+    input_2d(:,2,:) = from_netcdf_2d(INT(neighbor_cell_index(s_idx:e_idx,1)),step,:)
+    input_2d(:,3,:) = from_netcdf_2d(INT(neighbor_cell_index(s_idx:e_idx,2)),step,:)
+    input_2d(:,4,:) = from_netcdf_2d(INT(neighbor_cell_index(s_idx:e_idx,3)),step,:)
 
-    input_3d(1,:,1,:) = from_netcdf_3d(idx,:,step,:)
-    input_3d(1,:,2,:) = from_netcdf_3d(INT(neighbor_cell_index(idx,1)),:,step,:)
-    input_3d(1,:,3,:) = from_netcdf_3d(INT(neighbor_cell_index(idx,2)),:,step,:)
-    input_3d(1,:,4,:) = from_netcdf_3d(INT(neighbor_cell_index(idx,3)),:,step,:)
+    input_3d(:,:,1,:) = from_netcdf_3d(s_idx:e_idx,:,step,:)
+    input_3d(:,:,2,:) = from_netcdf_3d(INT(neighbor_cell_index(s_idx:e_idx,1)),:,step,:)
+    input_3d(:,:,3,:) = from_netcdf_3d(INT(neighbor_cell_index(s_idx:e_idx,2)),:,step,:)
+    input_3d(:,:,4,:) = from_netcdf_3d(INT(neighbor_cell_index(s_idx:e_idx,3)),:,step,:)
 
 
     ! apply model
