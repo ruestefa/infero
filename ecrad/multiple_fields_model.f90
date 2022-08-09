@@ -21,7 +21,7 @@ program my_program
   ! model of infero model
   type(infero_model) :: model_sw,model_lw
 
-  integer,parameter :: batch_size = 1000
+  integer,parameter :: batch_size = 10
 
   ! input and output tensors
   real(c_float) :: input_3d(batch_size,60,4,6)
@@ -70,8 +70,18 @@ program my_program
   call infero_check(oset_lw%initialise())
   call infero_check(oset_sw%initialise())
 
-  n_step = 12
-  idx=1235
+  ! input is identical for both models
+  call infero_check(iset%push_tensor(input_3d, "serving_default_input_3d"))
+  call infero_check(iset%push_tensor(input_2d, "serving_default_input_2d"))
+
+  ! LW
+  call infero_check(oset_lw%push_tensor(pred_lwflx, "StatefulPartitionedCall"))
+
+  ! SW
+  call infero_check(oset_sw%push_tensor(pred_swflx, "StatefulPartitionedCall"))
+
+  n_step = 1
+  idx=1
 
   ALLOCATE(swflx(batch_size,60,2,n_step))
   ALLOCATE(lwflx(batch_size,60,2,n_step))
@@ -144,17 +154,6 @@ program my_program
   varname="qv"
   call readgrid_2d(nc_name,varname,from_netcdf_3d(:,:,:,6),dim_len(1),dim_len(3),dim_len(6))
 
-  !JJ: unclear wether push needs to be done after value assignemnt
-
-  ! input is identical for both models
-  call infero_check(iset%push_tensor(input_3d, "serving_default_input_3d"))
-  call infero_check(iset%push_tensor(input_2d, "serving_default_input_2d"))
-
-  ! LW
-  call infero_check(oset_lw%push_tensor(pred_lwflx, "StatefulPartitionedCall"))
-
-  ! SW
-  call infero_check(oset_sw%push_tensor(pred_swflx, "StatefulPartitionedCall"))
 
   s_idx = idx
   e_idx = idx + batch_size
@@ -189,8 +188,12 @@ program my_program
   print*, 'Statistics:'
   DO step=1,n_step
     print*, 'step: ', step
-    print*, 'SW: ',MAXVAL(pred_swflx), MINVAL(pred_swflx)
-    print*, 'LW: ',MAXVAL(pred_lwflx), MINVAL(pred_lwflx)
+    print*, 'SW (all levels): ',MAXVAL(swflx(:,:,:,step)), MINVAL(swflx(:,:,:,step))
+    print*, 'LW (all levels): ',MAXVAL(lwflx(:,:,:,step)), MINVAL(lwflx(:,:,:,step))
+    print*, 'SW (sfc): ',MAXVAL(swflx(:,1,:,step)), MINVAL(swflx(:,1,:,step))
+    print*, 'LW (sfc): ',MAXVAL(lwflx(:,1,:,step)), MINVAL(lwflx(:,1,:,step))
+    print*, 'SW (toa): ',MAXVAL(swflx(:,60,:,step)), MINVAL(swflx(:,60,:,step))
+    print*, 'LW (toa): ',MAXVAL(lwflx(:,60,:,step)), MINVAL(lwflx(:,60,:,step))
     print*, ''
   ENDDO
 
