@@ -21,7 +21,11 @@ program my_program
   ! model of infero model
   type(infero_model) :: model_sw,model_lw
 
+  !integer,parameter :: batch_size = 100
+  !integer,parameter :: batch_size = 1000
   integer,parameter :: batch_size = 81919
+  REAL (c_float), PARAMETER ::  pi = 3.14159265358979323846264338327950288
+  REAL (c_float), PARAMETER ::  rad2deg   = 180.0/pi
 
   ! input and output tensors
   real(c_float) :: input_3d(batch_size,60,4,6)
@@ -41,7 +45,8 @@ program my_program
 
   real(c_float), allocatable :: from_netcdf_3d(:,:,:,:), from_netcdf_2d(:,:,:), neighbor_cell_index(:,:)
   real(c_float), allocatable :: swflx(:,:,:,:), lwflx(:,:,:,:)
-  real(c_float) :: percentage
+  real(c_float) :: percentage, lat_min,lat_max,lon_min,lon_max
+  real(c_float), allocatable :: clat(:), clon(:),lon(:),lat(:)
 
   ! Get CL arguments
   CALL get_command_argument(1, model_path_lw)
@@ -107,9 +112,35 @@ program my_program
   call get_nc_dims(icon_grid,grid_dim_name,grid_dim_len,14)
 
   ALLOCATE(neighbor_cell_index(grid_dim_len(1),grid_dim_len(5)))
+  ALLOCATE(clat(grid_dim_len(1)))
+  ALLOCATE(clon(grid_dim_len(1)))
+  ALLOCATE(lat(batch_size + 1))
+  ALLOCATE(lon(batch_size + 1))
 
   varname="neighbor_cell_index"
   call readgrid_1d(icon_grid,varname,neighbor_cell_index(:,:),grid_dim_len(1),grid_dim_len(5))
+
+  varname="clat"
+  call readgrid_0d(icon_grid,varname,clat,grid_dim_len(1))
+  varname="clon"
+  call readgrid_0d(icon_grid,varname,clon,grid_dim_len(1))
+
+  ! compute domain extent
+  DO i=1,batch_size+1
+    lon(i) = rad2deg * clon(i)
+    lat(i) = rad2deg * clat(i)
+  ENDDO
+
+  lon_max = MAXVAL(lon(:))
+  lon_min = MINVAL(lon(:))
+  lat_max = MAXVAL(lat(:))
+  lat_min = MINVAL(lat(:))
+
+
+
+  write(*,'(A,I7,A)') 'Domain extent for batch_size', batch_size,':'
+  write(*,'(A,F8.2,A,F8.2)') '  latmax:', lat_max, ' latmin', lat_min
+  write(*,'(A,F8.2,A,F8.2)') '  lonmax:', lon_max, ' lonmin', lon_min
 
   ! data
   call get_nc_dims(nc_name,dim_name,dim_len,6)
@@ -208,6 +239,10 @@ program my_program
     ENDDO
   ENDDO
 
+  write(*,'(A,I7,A)') 'Domain extent for batch_size', batch_size,':'
+  write(*,'(A,F8.2,A,F8.2)') '  latmax:', lat_max, ' latmin', lat_min
+  write(*,'(A,F8.2,A,F8.2)') '  lonmax:', lon_max, ' lonmin', lon_min
+
   write(*,'(I7,A)') batch_size*60*2,' datapoints scanned for each step'
   DO step=1,n_step
     percentage = MAX(0.0,100.0 * REAL(counter(step))/REAL((batch_size*60*2)))
@@ -293,6 +328,32 @@ SUBROUTINE readgrid_2d(infile,varname,idata,nx,ny,nz)
   CALL check(nf90_close(ncid))
 
 END SUBROUTINE readgrid_2d
+
+SUBROUTINE readgrid_0d(infile,varname,idata,nx)
+  use iso_c_binding, only : c_float
+  use netcdf
+
+  REAL(c_float), DIMENSION(nx), INTENT(OUT) :: idata
+  INTEGER(KIND=4), INTENT(IN) :: nx
+  INTEGER(KIND=4), DIMENSION(1) :: dimids
+  INTEGER(KIND=4) :: ncid, ndims, varid
+  CHARACTER(LEN=1024), INTENT(IN) :: infile,varname
+  !Open netCDF file
+  !:-------:-------:-------:-------:-------:-------:-------:-------:
+  CALL check(nf90_open(TRIM(infile), nf90_nowrite, ncid))
+  CALL check(nf90_inq_varid(ncid,TRIM(varname),varid))
+  CALL check(nf90_inquire_variable(ncid=ncid,varid=varid,ndims=ndims,dimids=dimids))
+
+  write(*,'(A)') TRIM(varname)
+  write(*,'(A,I2)') '   ndims:',ndims
+  write(*,*) '   dimids:',dimids
+
+  CALL check(nf90_get_var(ncid,varid,idata))
+  !Close netCDF file
+  !:-------:-------:-------:-------:-------:-------:-------:-------:
+  CALL check(nf90_close(ncid))
+
+END SUBROUTINE readgrid_0d
 
 SUBROUTINE readgrid_1d(infile,varname,idata,nx,ny)
   use iso_c_binding, only : c_float
