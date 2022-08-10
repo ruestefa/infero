@@ -21,7 +21,7 @@ program my_program
   ! model of infero model
   type(infero_model) :: model_sw,model_lw
 
-  integer,parameter :: batch_size = 10
+  integer,parameter :: batch_size = 1000
 
   ! input and output tensors
   real(c_float) :: input_3d(batch_size,60,4,6)
@@ -33,10 +33,11 @@ program my_program
   ! netcdf
   character(1024) :: nc_name,varname,icon_grid
   character(50) :: dim_name(6),grid_dim_name(14)
+  character(19) :: timestamp(4)
   integer :: dim_len(6),grid_dim_len(14)
 
   ! indices from notebook
-  integer :: step, idx,n_step, s_idx,e_idx
+  integer :: step, idx,n_step, s_idx,e_idx, step_idx(4)
 
   real(c_float), allocatable :: from_netcdf_3d(:,:,:,:), from_netcdf_2d(:,:,:), neighbor_cell_index(:,:)
   real(c_float), allocatable :: swflx(:,:,:,:), lwflx(:,:,:,:)
@@ -80,8 +81,13 @@ program my_program
   ! SW
   call infero_check(oset_sw%push_tensor(pred_swflx, "StatefulPartitionedCall"))
 
-  n_step = 1
+  n_step = 4
   idx=1
+
+  timestamp(1) = "2000-12-14 00:00:00"
+  timestamp(2) = "2000-12-14 06:00:00"
+  timestamp(3) = "2000-12-14 12:00:00"
+  timestamp(4) = "2000-12-14 18:00:00"
 
   ALLOCATE(swflx(batch_size,60,2,n_step))
   ALLOCATE(lwflx(batch_size,60,2,n_step))
@@ -157,16 +163,20 @@ program my_program
 
   s_idx = idx
   e_idx = idx + batch_size
+  step_idx(1) = 1
+  step_idx(2) = 3
+  step_idx(3) = 5
+  step_idx(4) = 7
   DO step=1,n_step
-    input_2d(:,1,:) = from_netcdf_2d(s_idx:e_idx,step,:)
-    input_2d(:,2,:) = from_netcdf_2d(INT(neighbor_cell_index(s_idx:e_idx,1)),step,:)
-    input_2d(:,3,:) = from_netcdf_2d(INT(neighbor_cell_index(s_idx:e_idx,2)),step,:)
-    input_2d(:,4,:) = from_netcdf_2d(INT(neighbor_cell_index(s_idx:e_idx,3)),step,:)
+    input_2d(:,1,:) = from_netcdf_2d(s_idx:e_idx,step_idx(step),:)
+    input_2d(:,2,:) = from_netcdf_2d(INT(neighbor_cell_index(s_idx:e_idx,1)),step_idx(step),:)
+    input_2d(:,3,:) = from_netcdf_2d(INT(neighbor_cell_index(s_idx:e_idx,2)),step_idx(step),:)
+    input_2d(:,4,:) = from_netcdf_2d(INT(neighbor_cell_index(s_idx:e_idx,3)),step_idx(step),:)
 
     input_3d(:,:,1,:) = from_netcdf_3d(s_idx:e_idx,:,step,:)
-    input_3d(:,:,2,:) = from_netcdf_3d(INT(neighbor_cell_index(s_idx:e_idx,1)),:,step,:)
-    input_3d(:,:,3,:) = from_netcdf_3d(INT(neighbor_cell_index(s_idx:e_idx,2)),:,step,:)
-    input_3d(:,:,4,:) = from_netcdf_3d(INT(neighbor_cell_index(s_idx:e_idx,3)),:,step,:)
+    input_3d(:,:,2,:) = from_netcdf_3d(INT(neighbor_cell_index(s_idx:e_idx,1)),:,step_idx(step),:)
+    input_3d(:,:,3,:) = from_netcdf_3d(INT(neighbor_cell_index(s_idx:e_idx,2)),:,step_idx(step),:)
+    input_3d(:,:,4,:) = from_netcdf_3d(INT(neighbor_cell_index(s_idx:e_idx,3)),:,step_idx(step),:)
 
 
     ! apply model
@@ -187,7 +197,7 @@ program my_program
 
   print*, 'Statistics:'
   DO step=1,n_step
-    print*, 'step: ', step
+    print*, timestamp(step)
     print*, 'SW (all levels): ',MAXVAL(swflx(:,:,:,step)), MINVAL(swflx(:,:,:,step))
     print*, 'LW (all levels): ',MAXVAL(lwflx(:,:,:,step)), MINVAL(lwflx(:,:,:,step))
     print*, 'SW (sfc): ',MAXVAL(swflx(:,1,:,step)), MINVAL(swflx(:,1,:,step))
