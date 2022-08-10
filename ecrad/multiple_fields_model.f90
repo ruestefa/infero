@@ -21,7 +21,7 @@ program my_program
   ! model of infero model
   type(infero_model) :: model_sw,model_lw
 
-  integer,parameter :: batch_size = 1000
+  integer,parameter :: batch_size = 81919
 
   ! input and output tensors
   real(c_float) :: input_3d(batch_size,60,4,6)
@@ -37,10 +37,11 @@ program my_program
   integer :: dim_len(6),grid_dim_len(14)
 
   ! indices from notebook
-  integer :: step, idx,n_step, s_idx,e_idx, step_idx(4)
+  integer :: step, idx,n_step, s_idx,e_idx, step_idx(4),i,k,id_d, counter(4)
 
   real(c_float), allocatable :: from_netcdf_3d(:,:,:,:), from_netcdf_2d(:,:,:), neighbor_cell_index(:,:)
   real(c_float), allocatable :: swflx(:,:,:,:), lwflx(:,:,:,:)
+  real(c_float) :: percentage
 
   ! Get CL arguments
   CALL get_command_argument(1, model_path_lw)
@@ -194,17 +195,46 @@ program my_program
 ! finalise infero library
   call infero_check(infero_finalise())
 
-
-  print*, 'Statistics:'
+  counter(:) = 0
   DO step=1,n_step
-    print*, timestamp(step)
-    print*, 'SW (all levels): ',MAXVAL(swflx(:,:,:,step)), MINVAL(swflx(:,:,:,step))
-    print*, 'LW (all levels): ',MAXVAL(lwflx(:,:,:,step)), MINVAL(lwflx(:,:,:,step))
-    print*, 'SW (sfc): ',MAXVAL(swflx(:,1,:,step)), MINVAL(swflx(:,1,:,step))
-    print*, 'LW (sfc): ',MAXVAL(lwflx(:,1,:,step)), MINVAL(lwflx(:,1,:,step))
-    print*, 'SW (toa): ',MAXVAL(swflx(:,60,:,step)), MINVAL(swflx(:,60,:,step))
-    print*, 'LW (toa): ',MAXVAL(lwflx(:,60,:,step)), MINVAL(lwflx(:,60,:,step))
-    print*, ''
+    DO i=1,batch_size
+      DO k=1,60
+        DO id_d=1,2
+          IF(swflx(i,k,id_d,step) < 0.0) THEN
+            counter(step) = counter(step) + 1
+          ENDIF
+        ENDDO
+      ENDDO
+    ENDDO
+  ENDDO
+
+  write(*,'(I7,A)') batch_size*60*2,' datapoints scanned for each step'
+  DO step=1,n_step
+    percentage = MAX(0.0,100.0 * REAL(counter(step))/REAL((batch_size*60*2)))
+    write(*,'(F6.1,A,A)') percentage, '% values below 0.0 for ',timestamp(step)
+  ENDDO
+
+
+  write(*,'(A)') 'Statistics'
+  DO step=1,n_step
+    write(*,'(A)') ''
+    write(*,'(A,A)') '  ',timestamp(step)
+    write(*,'(A)') '    Downwards:'
+    write(*,'(A,F8.2,F8.2)') '     SW (all levels): ',MAXVAL(swflx(:,:,1,step)), MINVAL(swflx(:,:,1,step))
+    write(*,'(A,F8.2,F8.2)') '     LW (all levels): ',MAXVAL(lwflx(:,:,1,step)), MINVAL(lwflx(:,:,1,step))
+    write(*,'(A,F8.2,F8.2)') '     SW (sfc): ',MAXVAL(swflx(:,1,1,step)), MINVAL(swflx(:,1,1,step))
+    write(*,'(A,F8.2,F8.2)') '     LW (sfc): ',MAXVAL(lwflx(:,1,1,step)), MINVAL(lwflx(:,1,1,step))
+    write(*,'(A,F8.2,F8.2)') '     SW (toa): ',MAXVAL(swflx(:,60,1,step)), MINVAL(swflx(:,60,1,step))
+    write(*,'(A,F8.2,F8.2)') '     LW (toa): ',MAXVAL(lwflx(:,60,1,step)), MINVAL(lwflx(:,60,1,step))
+    write(*,'(A)') ''
+    write(*,'(A)') '    Upwards:'
+    write(*,'(A,F8.2,F8.2)') '     SW (all levels): ',MAXVAL(swflx(:,:,2,step)), MINVAL(swflx(:,:,2,step))
+    write(*,'(A,F8.2,F8.2)') '     LW (all levels): ',MAXVAL(lwflx(:,:,2,step)), MINVAL(lwflx(:,:,2,step))
+    write(*,'(A,F8.2,F8.2)') '     SW (sfc): ',MAXVAL(swflx(:,1,2,step)), MINVAL(swflx(:,1,2,step))
+    write(*,'(A,F8.2,F8.2)') '     LW (sfc): ',MAXVAL(lwflx(:,1,2,step)), MINVAL(lwflx(:,1,2,step))
+    write(*,'(A,F8.2,F8.2)') '     SW (toa): ',MAXVAL(swflx(:,60,2,step)), MINVAL(swflx(:,60,2,step))
+    write(*,'(A,F8.2,F8.2)') '     LW (toa): ',MAXVAL(lwflx(:,60,2,step)), MINVAL(lwflx(:,60,2,step))
+    write(*,'(A)') ''
   ENDDO
 
 
@@ -223,10 +253,10 @@ SUBROUTINE get_nc_dims(infile,dim_name,dim_len,nr_dims)
   !Inquire about the dimensions
   !:-------:-------:-------:-------:-------:-------:-------:
 
-  print *, 'Dimension of NetCDF: ',TRIM(infile)
+  write(*,'(A,A)') 'Dimension of NetCDF: ',TRIM(infile)
   DO i=1,nr_dims
     CALL check(nf90_inquire_dimension(ncid,i,dim_name(i),dim_len(i)))
-    print *, '  ',TRIM(dim_name(i)), ':', dim_len(i)
+    write(*,'(A,A,A,I7)') '  ',TRIM(dim_name(i)), ':', dim_len(i)
   ENDDO
   !Close netCDF file
   !:-------:-------:-------:-------:-------:-------:-------:
@@ -253,9 +283,9 @@ SUBROUTINE readgrid_2d(infile,varname,idata,nx,ny,nz)
   CALL check(nf90_inquire_variable(ncid=ncid,varid=varid,ndims=ndims))
   CALL check(nf90_inquire_variable(ncid=ncid,varid=varid,ndims=ndims,dimids=dimids))
 
-  print *, TRIM(varname)
-  PRINT *, '   ndims:',ndims
-  PRINT *, '   dimids:',dimids
+  write(*,'(A)') TRIM(varname)
+  write(*,'(A,I2)') '   ndims:',ndims
+  write(*,*) '   dimids:',dimids
 
   CALL check(nf90_get_var(ncid,varid,idata))
   !Close netCDF file
@@ -279,9 +309,9 @@ SUBROUTINE readgrid_1d(infile,varname,idata,nx,ny)
   CALL check(nf90_inq_varid(ncid,TRIM(varname),varid))
   CALL check(nf90_inquire_variable(ncid=ncid,varid=varid,ndims=ndims,dimids=dimids))
 
-  print *, TRIM(varname)
-  PRINT *, '   ndims:',ndims
-  PRINT *, '   dimids:',dimids
+  write(*,'(A)') TRIM(varname)
+  write(*,'(A,I2)') '   ndims:',ndims
+  write(*,*) '   dimids:',dimids
 
   CALL check(nf90_get_var(ncid,varid,idata))
   !Close netCDF file
@@ -295,7 +325,7 @@ SUBROUTINE check(istatus)
 
   INTEGER, INTENT (IN) :: istatus
   IF (istatus /= nf90_noerr) THEN
-  write(*,*) TRIM((nf90_strerror(istatus)))
+  write(*,'(A)') TRIM((nf90_strerror(istatus)))
   END IF
 END SUBROUTINE check
 !:=========================================================================
