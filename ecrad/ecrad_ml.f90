@@ -10,6 +10,8 @@ program ecrad_ml
 
   ! model of infero model
   type(infero_model) :: model_sw,model_lw
+  type(infero_tensor_set) :: iset
+  type(infero_tensor_set) :: oset_lw, oset_sw
 
   ! parameters
   REAL (c_float), PARAMETER ::  pi = 3.14159265358979323846264338327950288
@@ -24,8 +26,6 @@ program ecrad_ml
   real(c_float) :: input_3d(batch_size,60,4,6)
   real(c_float) :: input_2d(batch_size,4,8)
   real(c_float) :: pred_swflx(batch_size,60,2), pred_lwflx(batch_size,60,2)
-  type(infero_tensor_set) :: iset
-  type(infero_tensor_set) :: oset_lw, oset_sw
 
   ! netcdf
   character(1024) :: netcdf_data_file,varname,icon_grid
@@ -33,14 +33,17 @@ program ecrad_ml
   character(19) :: timestamp(4)
   integer :: dim_len(6),grid_dim_len(14)
 
-  ! indices from notebook
+  ! indices
   integer :: step, nsteps, s_idx,e_idx, nc_time_idx(4),i,k,id_d, counter(4)
 
+  ! data fields
   real(c_float), allocatable :: from_netcdf_3d(:,:,:,:), from_netcdf_2d(:,:,:), neighbor_cell_index(:,:), abs_diff(:,:,:,:)
   real(c_float), allocatable :: swflx(:,:,:,:), lwflx(:,:,:,:)
-  real(c_float) :: percentage, lat_min,lat_max,lon_min,lon_max
   real(c_float), allocatable :: clat(:), clon(:),lon(:),lat(:)
   real(c_float):: mean_absolute_error(4,4)
+
+  ! scalars
+  real(c_float) :: percentage, lat_min,lat_max,lon_min,lon_max
 
   ! Get CL arguments
   CALL get_command_argument(1, model_path_lw)
@@ -145,8 +148,7 @@ program ecrad_ml
   ALLOCATE(from_netcdf_3d(dim_len(1),dim_len(3),dim_len(6),10))
   ALLOCATE(from_netcdf_2d(dim_len(1),dim_len(6),8))
 
-
-  ! 2D FIELDS
+  ! 2d fields
   varname="pres_sfc"
   call read_nc_2d(netcdf_data_file,varname,from_netcdf_2d(:,:,1),dim_len(1),dim_len(6))
 
@@ -171,7 +173,7 @@ program ecrad_ml
   varname="albnirdif"
   call read_nc_2d(netcdf_data_file,varname,from_netcdf_2d(:,:,8),dim_len(1),dim_len(6))
 
-  ! 3D FIELDS
+  ! 3d fields
   varname="clc"
   call read_nc_3d(netcdf_data_file,varname,from_netcdf_3d(:,:,:,1),dim_len(1),dim_len(3),dim_len(6))
 
@@ -240,7 +242,18 @@ program ecrad_ml
   ENDDO
 
 
+  ! DOMAIN EXTENT
+  write(*,'(A,I7,A)') 'Domain extent for batch_size', batch_size,':'
+  write(*,'(A,F8.2,A,F8.2)') '  latmax:', lat_max, ' latmin', lat_min
+  write(*,'(A,F8.2,A,F8.2)') '  lonmax:', lon_max, ' lonmin', lon_min
 
+
+  ! STATISTICS
+  write(*,'(A)') ''
+  write(*,'(A)') 'STATISTICS'
+  write(*,'(A)') ''
+
+  ! values below zero for SW
   counter(:) = 0
   DO step=1,nsteps
     DO i=1,batch_size
@@ -254,10 +267,6 @@ program ecrad_ml
     ENDDO
   ENDDO
 
-  write(*,'(A,I7,A)') 'Domain extent for batch_size', batch_size,':'
-  write(*,'(A,F8.2,A,F8.2)') '  latmax:', lat_max, ' latmin', lat_min
-  write(*,'(A,F8.2,A,F8.2)') '  lonmax:', lon_max, ' lonmin', lon_min
-
   write(*,'(I7,A)') batch_size*60*2,' datapoints scanned for each step of SW-flux'
   DO step=1,nsteps
     percentage = MAX(0.0,100.0 * REAL(counter(step))/REAL((batch_size*60*2)))
@@ -267,6 +276,8 @@ program ecrad_ml
   ! absolute difference 
   ALLOCATE(abs_diff(batch_size+1,dim_len(3),dim_len(6),4))
 
+  write(*,'(A)') ''
+  write(*,'(A)') '  Mean Absolute Error (MAE):'
   DO step=1,nsteps
     ! lwflux_up
     abs_diff(:,:,1,step) = ABS(lwflx(:,:,1,step) - from_netcdf_3d(s_idx:e_idx,:,nc_time_idx(step),7))
@@ -282,46 +293,39 @@ program ecrad_ml
     CALL mean_2d(abs_diff(:,:,2,step), mean_absolute_error(2,step),batch_size,60)
     CALL mean_2d(abs_diff(:,:,3,step), mean_absolute_error(3,step),batch_size,60)
     CALL mean_2d(abs_diff(:,:,4,step), mean_absolute_error(4,step),batch_size,60)
+
+    write(*,'(A)') ''
+    write(*,'(A,A)') '    ',timestamp(step)
+    write(*,'(A)') '      Upwards:'
+    write(*,'(A,F8.2)') '        SW (all levels): ',mean_absolute_error(3,step)
+    write(*,'(A,F8.2)') '        LW (all levels): ',mean_absolute_error(1,step)
+    write(*,'(A)') '      Downwards:'
+    write(*,'(A,F8.2)') '        SW (all levels): ',mean_absolute_error(4,step)
+    write(*,'(A,F8.2)') '        LW (all levels): ',mean_absolute_error(2,step)
   ENDDO
 
-
   write(*,'(A)') ''
-  write(*,'(A)') 'Statistics'
+  write(*,'(A)') '  MIN/MAX values for different levels'
   DO step=1,nsteps
     write(*,'(A)') ''
     write(*,'(A,A)') '  ',timestamp(step)
     write(*,'(A)') '    Upwards:'
-    write(*,'(A,F8.2,F8.2)') '     SW (all levels): ',MAXVAL(swflx(:,:,1,step)), MINVAL(swflx(:,:,1,step))
-    write(*,'(A,F8.2,F8.2)') '     LW (all levels): ',MAXVAL(lwflx(:,:,1,step)), MINVAL(lwflx(:,:,1,step))
-    write(*,'(A,F8.2,F8.2)') '     SW (sfc): ',MAXVAL(swflx(:,1,1,step)), MINVAL(swflx(:,1,1,step))
-    write(*,'(A,F8.2,F8.2)') '     LW (sfc): ',MAXVAL(lwflx(:,1,1,step)), MINVAL(lwflx(:,1,1,step))
-    write(*,'(A,F8.2,F8.2)') '     SW (toa): ',MAXVAL(swflx(:,60,1,step)), MINVAL(swflx(:,60,1,step))
-    write(*,'(A,F8.2,F8.2)') '     LW (toa): ',MAXVAL(lwflx(:,60,1,step)), MINVAL(lwflx(:,60,1,step))
+    write(*,'(A,F8.2,A,F8.2)') '     SW (all levels): MAX ',MAXVAL(swflx(:,:,1,step)),' MIN ',MINVAL(swflx(:,:,1,step))
+    write(*,'(A,F8.2,A,F8.2)') '     LW (all levels): MAX ',MAXVAL(lwflx(:,:,1,step)),' MIN ', MINVAL(lwflx(:,:,1,step))
+    write(*,'(A,F8.2,A,F8.2)') '     SW (sfc): MAX ',MAXVAL(swflx(:,1,1,step)),' MIN ', MINVAL(swflx(:,1,1,step))
+    write(*,'(A,F8.2,A,F8.2)') '     LW (sfc): MAX ',MAXVAL(lwflx(:,1,1,step)),' MIN ', MINVAL(lwflx(:,1,1,step))
+    write(*,'(A,F8.2,A,F8.2)') '     SW (toa): MAX ',MAXVAL(swflx(:,60,1,step)),' MIN ', MINVAL(swflx(:,60,1,step))
+    write(*,'(A,F8.2,A,F8.2)') '     LW (toa): MAX ',MAXVAL(lwflx(:,60,1,step)),' MIN ', MINVAL(lwflx(:,60,1,step))
     write(*,'(A)') ''
     write(*,'(A)') '    Downwards:'
-    write(*,'(A,F8.2,F8.2)') '     SW (all levels): ',MAXVAL(swflx(:,:,2,step)), MINVAL(swflx(:,:,2,step))
-    write(*,'(A,F8.2,F8.2)') '     LW (all levels): ',MAXVAL(lwflx(:,:,2,step)), MINVAL(lwflx(:,:,2,step))
-    write(*,'(A,F8.2,F8.2)') '     SW (sfc): ',MAXVAL(swflx(:,1,2,step)), MINVAL(swflx(:,1,2,step))
-    write(*,'(A,F8.2,F8.2)') '     LW (sfc): ',MAXVAL(lwflx(:,1,2,step)), MINVAL(lwflx(:,1,2,step))
-    write(*,'(A,F8.2,F8.2)') '     SW (toa): ',MAXVAL(swflx(:,60,2,step)), MINVAL(swflx(:,60,2,step))
-    write(*,'(A,F8.2,F8.2)') '     LW (toa): ',MAXVAL(lwflx(:,60,2,step)), MINVAL(lwflx(:,60,2,step))
-    write(*,'(A)') ''
-    write(*,'(A)') '    Absolute difference to reference'
-    write(*,'(A)') '      Upwards:'
-    write(*,'(A,F8.2,F8.2,F8.2)') '        SW (all levels): ',mean_absolute_error(3,step),MAXVAL(abs_diff(:,:,3,step)),MINVAL(abs_diff(:,:,3,step))
-    write(*,'(A,F8.2,F8.2,F8.2)') '        LW (all levels): ',mean_absolute_error(1,step),MAXVAL(abs_diff(:,:,1,step)),MINVAL(abs_diff(:,:,1,step))
-    write(*,'(A,F8.2,F8.2)') '        SW (sfc): ',MAXVAL(abs_diff(:,1,3,step)), MINVAL(abs_diff(:,1,3,step))
-    write(*,'(A,F8.2,F8.2)') '        LW (sfc): ',MAXVAL(abs_diff(:,1,1,step)), MINVAL(abs_diff(:,1,1,step))
-    write(*,'(A,F8.2,F8.2)') '        SW (toa): ',MAXVAL(abs_diff(:,60,3,step)), MINVAL(abs_diff(:,60,3,step))
-    write(*,'(A,F8.2,F8.2)') '        LW (toa): ',MAXVAL(abs_diff(:,60,1,step)), MINVAL(abs_diff(:,60,1,step))
-    write(*,'(A)') '      Downwards:'
-    write(*,'(A,F8.2,F8.2,F8.2)') '        SW (all levels): ',mean_absolute_error(4,step),MAXVAL(abs_diff(:,:,4,step)),MINVAL(abs_diff(:,:,4,step))
-    write(*,'(A,F8.2,F8.2,F8.2)') '        LW (all levels): ',mean_absolute_error(2,step),MAXVAL(abs_diff(:,:,2,step)),MINVAL(abs_diff(:,:,2,step))
-    write(*,'(A,F8.2,F8.2)') '        SW (sfc): ',MAXVAL(abs_diff(:,1,4,step)), MINVAL(abs_diff(:,1,4,step))
-    write(*,'(A,F8.2,F8.2)') '        LW (sfc): ',MAXVAL(abs_diff(:,1,2,step)), MINVAL(abs_diff(:,1,2,step))
-    write(*,'(A,F8.2,F8.2)') '        SW (toa): ',MAXVAL(abs_diff(:,60,4,step)), MINVAL(abs_diff(:,60,4,step))
-    write(*,'(A,F8.2,F8.2)') '        LW (toa): ',MAXVAL(abs_diff(:,60,2,step)), MINVAL(abs_diff(:,60,2,step))
+    write(*,'(A,F8.2,A,F8.2)') '     SW (all levels): MAX ',MAXVAL(swflx(:,:,2,step)),' MIN ', MINVAL(swflx(:,:,2,step))
+    write(*,'(A,F8.2,A,F8.2)') '     LW (all levels): MAX ',MAXVAL(lwflx(:,:,2,step)),' MIN ', MINVAL(lwflx(:,:,2,step))
+    write(*,'(A,F8.2,A,F8.2)') '     SW (sfc): MAX ',MAXVAL(swflx(:,1,2,step)),' MIN ', MINVAL(swflx(:,1,2,step))
+    write(*,'(A,F8.2,A,F8.2)') '     LW (sfc): MAX ',MAXVAL(lwflx(:,1,2,step)),' MIN ', MINVAL(lwflx(:,1,2,step))
+    write(*,'(A,F8.2,A,F8.2)') '     SW (toa): MAX ',MAXVAL(swflx(:,60,2,step)),' MIN ', MINVAL(swflx(:,60,2,step))
+    write(*,'(A,F8.2,A,F8.2)') '     LW (toa): MAX ',MAXVAL(lwflx(:,60,2,step)),' MIN ', MINVAL(lwflx(:,60,2,step))
   ENDDO
+
 
   ! CLEANUP 
 
@@ -331,6 +335,18 @@ program ecrad_ml
 
   ! finalise infero library
   call infero_check(infero_finalise())
+
+  ! deallocate
+  DEALLOCATE(swflx)
+  DEALLOCATE(lwflx)
+  DEALLOCATE(neighbor_cell_index)
+  DEALLOCATE(clat)
+  DEALLOCATE(clon)
+  DEALLOCATE(lat)
+  DEALLOCATE(lon)
+  DEALLOCATE(from_netcdf_3d)
+  DEALLOCATE(from_netcdf_2d)
+  DEALLOCATE(abs_diff)
 
 end program
 
