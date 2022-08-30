@@ -1,9 +1,6 @@
 #!/bin/bash -l
 
-module load PrgEnv-gnu
-module switch gcc gcc/9.3.0
-module load cray-netcdf/4.7.4.4
-
+. ../dev/daint_env.sh
 
 INFERO_ROOT='/scratch/snx3000/juckerj/WG_1_tasks/ecrad/install_infero/builds/infero/'
 LIBS='-linferoapi -linferof -lnetcdff -lnetcdf'
