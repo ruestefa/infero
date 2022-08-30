@@ -22,8 +22,8 @@ program my_program
   type(infero_model) :: model_sw,model_lw
 
   !integer,parameter :: batch_size = 100
-  !integer,parameter :: batch_size = 1000
-  integer,parameter :: batch_size = 81919
+  integer,parameter :: batch_size = 1000
+  !integer,parameter :: batch_size = 81919
   REAL (c_float), PARAMETER ::  pi = 3.14159265358979323846264338327950288
   REAL (c_float), PARAMETER ::  rad2deg   = 180.0/pi
 
@@ -43,7 +43,7 @@ program my_program
   ! indices from notebook
   integer :: step, idx,n_step, s_idx,e_idx, step_idx(4),i,k,id_d, counter(4)
 
-  real(c_float), allocatable :: from_netcdf_3d(:,:,:,:), from_netcdf_2d(:,:,:), neighbor_cell_index(:,:)
+  real(c_float), allocatable :: from_netcdf_3d(:,:,:,:), from_netcdf_2d(:,:,:), neighbor_cell_index(:,:), diff_to_ref(:,:,:,:)
   real(c_float), allocatable :: swflx(:,:,:,:), lwflx(:,:,:,:)
   real(c_float) :: percentage, lat_min,lat_max,lon_min,lon_max
   real(c_float), allocatable :: clat(:), clon(:),lon(:),lat(:)
@@ -145,7 +145,8 @@ program my_program
   ! data
   call get_nc_dims(nc_name,dim_name,dim_len,6)
 
-  ALLOCATE(from_netcdf_3d(dim_len(1),dim_len(3),dim_len(6),6))
+  ALLOCATE(from_netcdf_3d(dim_len(1),dim_len(3),dim_len(6),10))
+  ALLOCATE(diff_to_ref(dim_len(1),dim_len(3),dim_len(6),4))
   ALLOCATE(from_netcdf_2d(dim_len(1),dim_len(6),8))
 
   ! 2D FIELDS
@@ -192,20 +193,39 @@ program my_program
   varname="qv"
   call readgrid_2d(nc_name,varname,from_netcdf_3d(:,:,:,6),dim_len(1),dim_len(3),dim_len(6))
 
+  varname="lwflx_up"
+  call readgrid_2d(nc_name,varname,from_netcdf_3d(:,:,:,7),dim_len(1),dim_len(3),dim_len(6))
+
+  varname="lwflx_dn"
+  call readgrid_2d(nc_name,varname,from_netcdf_3d(:,:,:,8),dim_len(1),dim_len(3),dim_len(6))
+
+  varname="swflx_up"
+  call readgrid_2d(nc_name,varname,from_netcdf_3d(:,:,:,9),dim_len(1),dim_len(3),dim_len(6))
+
+  varname="swflx_dn"
+  call readgrid_2d(nc_name,varname,from_netcdf_3d(:,:,:,10),dim_len(1),dim_len(3),dim_len(6))
+
 
   s_idx = idx
   e_idx = idx + batch_size
+
+  ! cover complete diurnal solar cycle
   step_idx(1) = 1
   step_idx(2) = 3
   step_idx(3) = 5
   step_idx(4) = 7
+
   DO step=1,n_step
+
     input_2d(:,1,:) = from_netcdf_2d(s_idx:e_idx,step_idx(step),:)
+
+    ! assign neigbours 2D
     input_2d(:,2,:) = from_netcdf_2d(INT(neighbor_cell_index(s_idx:e_idx,1)),step_idx(step),:)
     input_2d(:,3,:) = from_netcdf_2d(INT(neighbor_cell_index(s_idx:e_idx,2)),step_idx(step),:)
     input_2d(:,4,:) = from_netcdf_2d(INT(neighbor_cell_index(s_idx:e_idx,3)),step_idx(step),:)
 
-    input_3d(:,:,1,:) = from_netcdf_3d(s_idx:e_idx,:,step,:)
+    ! assign neigbours 3D
+    input_3d(:,:,1,:) = from_netcdf_3d(s_idx:e_idx,:,step_idx(step),:)
     input_3d(:,:,2,:) = from_netcdf_3d(INT(neighbor_cell_index(s_idx:e_idx,1)),:,step_idx(step),:)
     input_3d(:,:,3,:) = from_netcdf_3d(INT(neighbor_cell_index(s_idx:e_idx,2)),:,step_idx(step),:)
     input_3d(:,:,4,:) = from_netcdf_3d(INT(neighbor_cell_index(s_idx:e_idx,3)),:,step_idx(step),:)
@@ -243,18 +263,30 @@ program my_program
   write(*,'(A,F8.2,A,F8.2)') '  latmax:', lat_max, ' latmin', lat_min
   write(*,'(A,F8.2,A,F8.2)') '  lonmax:', lon_max, ' lonmin', lon_min
 
-  write(*,'(I7,A)') batch_size*60*2,' datapoints scanned for each step'
+  write(*,'(I7,A)') batch_size*60*2,' datapoints scanned for each step of SW-flux'
   DO step=1,n_step
     percentage = MAX(0.0,100.0 * REAL(counter(step))/REAL((batch_size*60*2)))
     write(*,'(F6.1,A,A)') percentage, '% values below 0.0 for ',timestamp(step)
   ENDDO
 
+  DO step=1,n_step
+    ! lwflux_up
+    diff_to_ref(:,:,1,step) = ABS(lwflx(:,:,1,step) - from_netcdf_3d(s_idx:e_idx,:,step_idx(step),7))
+    ! lwflux_dn
+    diff_to_ref(:,:,2,step) = ABS(swflx(:,:,2,step) - from_netcdf_3d(s_idx:e_idx,:,step_idx(step),8))
+    ! swflux_up
+    diff_to_ref(:,:,3,step) = ABS(swflx(:,:,1,step) - from_netcdf_3d(s_idx:e_idx,:,step_idx(step),9))
+    ! swflux_dn
+    diff_to_ref(:,:,4,step) = ABS(swflx(:,:,2,step) - from_netcdf_3d(s_idx:e_idx,:,step_idx(step),10))
+  ENDDO
 
+
+  write(*,'(A)') ''
   write(*,'(A)') 'Statistics'
   DO step=1,n_step
     write(*,'(A)') ''
     write(*,'(A,A)') '  ',timestamp(step)
-    write(*,'(A)') '    Downwards:'
+    write(*,'(A)') '    Upwards:'
     write(*,'(A,F8.2,F8.2)') '     SW (all levels): ',MAXVAL(swflx(:,:,1,step)), MINVAL(swflx(:,:,1,step))
     write(*,'(A,F8.2,F8.2)') '     LW (all levels): ',MAXVAL(lwflx(:,:,1,step)), MINVAL(lwflx(:,:,1,step))
     write(*,'(A,F8.2,F8.2)') '     SW (sfc): ',MAXVAL(swflx(:,1,1,step)), MINVAL(swflx(:,1,1,step))
@@ -262,7 +294,7 @@ program my_program
     write(*,'(A,F8.2,F8.2)') '     SW (toa): ',MAXVAL(swflx(:,60,1,step)), MINVAL(swflx(:,60,1,step))
     write(*,'(A,F8.2,F8.2)') '     LW (toa): ',MAXVAL(lwflx(:,60,1,step)), MINVAL(lwflx(:,60,1,step))
     write(*,'(A)') ''
-    write(*,'(A)') '    Upwards:'
+    write(*,'(A)') '    Downwards:'
     write(*,'(A,F8.2,F8.2)') '     SW (all levels): ',MAXVAL(swflx(:,:,2,step)), MINVAL(swflx(:,:,2,step))
     write(*,'(A,F8.2,F8.2)') '     LW (all levels): ',MAXVAL(lwflx(:,:,2,step)), MINVAL(lwflx(:,:,2,step))
     write(*,'(A,F8.2,F8.2)') '     SW (sfc): ',MAXVAL(swflx(:,1,2,step)), MINVAL(swflx(:,1,2,step))
@@ -270,6 +302,21 @@ program my_program
     write(*,'(A,F8.2,F8.2)') '     SW (toa): ',MAXVAL(swflx(:,60,2,step)), MINVAL(swflx(:,60,2,step))
     write(*,'(A,F8.2,F8.2)') '     LW (toa): ',MAXVAL(lwflx(:,60,2,step)), MINVAL(lwflx(:,60,2,step))
     write(*,'(A)') ''
+    write(*,'(A)') '    Absolute difference to reference'
+    write(*,'(A)') '      Upwards:'
+    write(*,'(A,F8.2,F8.2)') '     SW (all levels): ',MAXVAL(diff_to_ref(:,:,3,step)), MINVAL(diff_to_ref(:,:,3,step))
+    write(*,'(A,F8.2,F8.2)') '     LW (all levels): ',MAXVAL(diff_to_ref(:,:,1,step)), MINVAL(diff_to_ref(:,:,1,step))
+    write(*,'(A,F8.2,F8.2)') '     SW (sfc): ',MAXVAL(diff_to_ref(:,1,3,step)), MINVAL(diff_to_ref(:,1,3,step))
+    write(*,'(A,F8.2,F8.2)') '     LW (sfc): ',MAXVAL(diff_to_ref(:,1,1,step)), MINVAL(diff_to_ref(:,1,1,step))
+    write(*,'(A,F8.2,F8.2)') '     SW (toa): ',MAXVAL(diff_to_ref(:,60,3,step)), MINVAL(diff_to_ref(:,60,3,step))
+    write(*,'(A,F8.2,F8.2)') '     LW (toa): ',MAXVAL(diff_to_ref(:,60,1,step)), MINVAL(diff_to_ref(:,60,1,step))
+    write(*,'(A)') '      Downwards:'
+    write(*,'(A,F8.2,F8.2)') '     SW (all levels): ',MAXVAL(diff_to_ref(:,:,4,step)), MINVAL(diff_to_ref(:,:,4,step))
+    write(*,'(A,F8.2,F8.2)') '     LW (all levels): ',MAXVAL(diff_to_ref(:,:,2,step)), MINVAL(diff_to_ref(:,:,2,step))
+    write(*,'(A,F8.2,F8.2)') '     SW (sfc): ',MAXVAL(diff_to_ref(:,1,4,step)), MINVAL(diff_to_ref(:,1,4,step))
+    write(*,'(A,F8.2,F8.2)') '     LW (sfc): ',MAXVAL(diff_to_ref(:,1,2,step)), MINVAL(diff_to_ref(:,1,2,step))
+    write(*,'(A,F8.2,F8.2)') '     SW (toa): ',MAXVAL(diff_to_ref(:,60,4,step)), MINVAL(diff_to_ref(:,60,4,step))
+    write(*,'(A,F8.2,F8.2)') '     LW (toa): ',MAXVAL(diff_to_ref(:,60,2,step)), MINVAL(diff_to_ref(:,60,2,step))
   ENDDO
 
 
