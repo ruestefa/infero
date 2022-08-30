@@ -273,7 +273,7 @@ program my_program
     ! lwflux_up
     diff_to_ref(:,:,1,step) = ABS(lwflx(:,:,1,step) - from_netcdf_3d(s_idx:e_idx,:,step_idx(step),7))
     ! lwflux_dn
-    diff_to_ref(:,:,2,step) = ABS(swflx(:,:,2,step) - from_netcdf_3d(s_idx:e_idx,:,step_idx(step),8))
+    diff_to_ref(:,:,2,step) = ABS(lwflx(:,:,2,step) - from_netcdf_3d(s_idx:e_idx,:,step_idx(step),8))
     ! swflux_up
     diff_to_ref(:,:,3,step) = ABS(swflx(:,:,1,step) - from_netcdf_3d(s_idx:e_idx,:,step_idx(step),9))
     ! swflux_dn
@@ -304,19 +304,19 @@ program my_program
     write(*,'(A)') ''
     write(*,'(A)') '    Absolute difference to reference'
     write(*,'(A)') '      Upwards:'
-    write(*,'(A,F8.2,F8.2)') '     SW (all levels): ',MAXVAL(diff_to_ref(:,:,3,step)), MINVAL(diff_to_ref(:,:,3,step))
-    write(*,'(A,F8.2,F8.2)') '     LW (all levels): ',MAXVAL(diff_to_ref(:,:,1,step)), MINVAL(diff_to_ref(:,:,1,step))
-    write(*,'(A,F8.2,F8.2)') '     SW (sfc): ',MAXVAL(diff_to_ref(:,1,3,step)), MINVAL(diff_to_ref(:,1,3,step))
-    write(*,'(A,F8.2,F8.2)') '     LW (sfc): ',MAXVAL(diff_to_ref(:,1,1,step)), MINVAL(diff_to_ref(:,1,1,step))
-    write(*,'(A,F8.2,F8.2)') '     SW (toa): ',MAXVAL(diff_to_ref(:,60,3,step)), MINVAL(diff_to_ref(:,60,3,step))
-    write(*,'(A,F8.2,F8.2)') '     LW (toa): ',MAXVAL(diff_to_ref(:,60,1,step)), MINVAL(diff_to_ref(:,60,1,step))
+    write(*,'(A,F8.2,F8.2)') '        SW (all levels): ',MAXVAL(diff_to_ref(:,:,3,step)), MINVAL(diff_to_ref(:,:,3,step))
+    write(*,'(A,F8.2,F8.2)') '        LW (all levels): ',MAXVAL(diff_to_ref(:,:,1,step)), MINVAL(diff_to_ref(:,:,1,step))
+    write(*,'(A,F8.2,F8.2)') '        SW (sfc): ',MAXVAL(diff_to_ref(:,1,3,step)), MINVAL(diff_to_ref(:,1,3,step))
+    write(*,'(A,F8.2,F8.2)') '        LW (sfc): ',MAXVAL(diff_to_ref(:,1,1,step)), MINVAL(diff_to_ref(:,1,1,step))
+    write(*,'(A,F8.2,F8.2)') '        SW (toa): ',MAXVAL(diff_to_ref(:,60,3,step)), MINVAL(diff_to_ref(:,60,3,step))
+    write(*,'(A,F8.2,F8.2)') '        LW (toa): ',MAXVAL(diff_to_ref(:,60,1,step)), MINVAL(diff_to_ref(:,60,1,step))
     write(*,'(A)') '      Downwards:'
-    write(*,'(A,F8.2,F8.2)') '     SW (all levels): ',MAXVAL(diff_to_ref(:,:,4,step)), MINVAL(diff_to_ref(:,:,4,step))
-    write(*,'(A,F8.2,F8.2)') '     LW (all levels): ',MAXVAL(diff_to_ref(:,:,2,step)), MINVAL(diff_to_ref(:,:,2,step))
-    write(*,'(A,F8.2,F8.2)') '     SW (sfc): ',MAXVAL(diff_to_ref(:,1,4,step)), MINVAL(diff_to_ref(:,1,4,step))
-    write(*,'(A,F8.2,F8.2)') '     LW (sfc): ',MAXVAL(diff_to_ref(:,1,2,step)), MINVAL(diff_to_ref(:,1,2,step))
-    write(*,'(A,F8.2,F8.2)') '     SW (toa): ',MAXVAL(diff_to_ref(:,60,4,step)), MINVAL(diff_to_ref(:,60,4,step))
-    write(*,'(A,F8.2,F8.2)') '     LW (toa): ',MAXVAL(diff_to_ref(:,60,2,step)), MINVAL(diff_to_ref(:,60,2,step))
+    write(*,'(A,F8.2,F8.2)') '        SW (all levels): ',MAXVAL(diff_to_ref(:,:,4,step)), MINVAL(diff_to_ref(:,:,4,step))
+    write(*,'(A,F8.2,F8.2)') '        LW (all levels): ',MAXVAL(diff_to_ref(:,:,2,step)), MINVAL(diff_to_ref(:,:,2,step))
+    write(*,'(A,F8.2,F8.2)') '        SW (sfc): ',MAXVAL(diff_to_ref(:,1,4,step)), MINVAL(diff_to_ref(:,1,4,step))
+    write(*,'(A,F8.2,F8.2)') '        LW (sfc): ',MAXVAL(diff_to_ref(:,1,2,step)), MINVAL(diff_to_ref(:,1,2,step))
+    write(*,'(A,F8.2,F8.2)') '        SW (toa): ',MAXVAL(diff_to_ref(:,60,4,step)), MINVAL(diff_to_ref(:,60,4,step))
+    write(*,'(A,F8.2,F8.2)') '        LW (toa): ',MAXVAL(diff_to_ref(:,60,2,step)), MINVAL(diff_to_ref(:,60,2,step))
   ENDDO
 
 
