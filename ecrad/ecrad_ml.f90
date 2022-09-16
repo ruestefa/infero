@@ -9,9 +9,9 @@ program ecrad_ml
   character(1024) :: yaml_config
 
   ! model of infero model
-  type(infero_model) :: model_sw,model_lw
+  type(infero_model) :: model_sw,model_lw,model
   type(infero_tensor_set) :: iset
-  type(infero_tensor_set) :: oset_lw, oset_sw
+  type(infero_tensor_set) :: oset_lw, oset_sw,oset
 
   ! parameters
   REAL (c_float), PARAMETER ::  pi = 3.14159265358979323846264338327950288
@@ -19,13 +19,13 @@ program ecrad_ml
 
   ! define gridsize (icon grid indices)
   !integer,parameter :: batch_size = 100
-  integer,parameter :: batch_size = 1000
-  !integer,parameter :: batch_size = 81919
+  !integer,parameter :: batch_size = 1000
+  integer,parameter :: batch_size = 81919
 
   ! input and output tensors
-  real(c_float) :: input_3d(batch_size,60,4,6)
-  real(c_float) :: input_2d(batch_size,4,8)
-  real(c_float) :: pred_swflx(batch_size,60,2), pred_lwflx(batch_size,60,2)
+  real(c_float) :: input_3d(batch_size,60,1,6)
+  real(c_float) :: input_2d(batch_size,1,8)
+  real(c_float) ::  pred_flx(batch_size,60,4)
 
   ! netcdf
   character(1024) :: netcdf_data_file,varname,icon_grid
@@ -55,36 +55,39 @@ program ecrad_ml
   ! init infero
   call infero_check(infero_initialise())
 
-  ! YAML config string -> LW
+  ! YAML config string -> LW/SW
   yaml_config = "---"//NEW_LINE('A') &
     //"  path: "//TRIM(model_path_lw)//NEW_LINE('A') &
     //"  type: "//TRIM(model_type)//c_null_char
 
-  ! get a infero model for LW
-  call infero_check(model_lw%initialise_from_yaml_string(yaml_config))
+  ! get a infero model for LW/SW
+  call infero_check(model%initialise_from_yaml_string(yaml_config))
 
-  ! YAML config string -> SW
-  yaml_config = "---"//NEW_LINE('A') &
-    //"  path: "//TRIM(model_path_sw)//NEW_LINE('A') &
-    //"  type: "//TRIM(model_type)//c_null_char
+  !! YAML config string -> SW
+  !yaml_config = "---"//NEW_LINE('A') &
+  !  //"  path: "//TRIM(model_path_sw)//NEW_LINE('A') &
+  !  //"  type: "//TRIM(model_type)//c_null_char
 
   ! get a infero model for SW
-  call infero_check(model_sw%initialise_from_yaml_string(yaml_config))
+  !call infero_check(model_sw%initialise_from_yaml_string(yaml_config))
 
   ! init tensor sets
   call infero_check(iset%initialise())
-  call infero_check(oset_lw%initialise())
-  call infero_check(oset_sw%initialise())
+  !call infero_check(oset_lw%initialise())
+  !call infero_check(oset_sw%initialise())
+  call infero_check(oset%initialise())
 
   ! input is identical for both models
-  call infero_check(iset%push_tensor(input_3d, "serving_default_input_3d"))
-  call infero_check(iset%push_tensor(input_2d, "serving_default_input_2d"))
+  call infero_check(iset%push_tensor(input_3d, "serving_default_input_22"))
+  call infero_check(iset%push_tensor(input_2d, "serving_default_input_23"))
 
   ! LW
-  call infero_check(oset_lw%push_tensor(pred_lwflx, "StatefulPartitionedCall"))
+  !call infero_check(oset_lw%push_tensor(pred_lwflx, "StatefulPartitionedCall"))
 
   ! SW
-  call infero_check(oset_sw%push_tensor(pred_swflx, "StatefulPartitionedCall"))
+  !call infero_check(oset_sw%push_tensor(pred_swflx, "StatefulPartitionedCall"))
+
+  call infero_check(oset%push_tensor(pred_flx, "StatefulPartitionedCall"))
 
 
   ! DEFINE PERIOD (FULL SOLAR CYCLE)
@@ -217,9 +220,9 @@ program ecrad_ml
     input_2d(:,1,:) = from_netcdf_2d(s_idx:e_idx,nc_time_idx(step),:)
 
     ! neigbours
-    input_2d(:,2,:) = from_netcdf_2d(INT(neighbor_cell_index(s_idx:e_idx,1)),nc_time_idx(step),:)
-    input_2d(:,3,:) = from_netcdf_2d(INT(neighbor_cell_index(s_idx:e_idx,2)),nc_time_idx(step),:)
-    input_2d(:,4,:) = from_netcdf_2d(INT(neighbor_cell_index(s_idx:e_idx,3)),nc_time_idx(step),:)
+    !input_2d(:,2,:) = from_netcdf_2d(INT(neighbor_cell_index(s_idx:e_idx,1)),nc_time_idx(step),:)
+    !input_2d(:,3,:) = from_netcdf_2d(INT(neighbor_cell_index(s_idx:e_idx,2)),nc_time_idx(step),:)
+    !input_2d(:,4,:) = from_netcdf_2d(INT(neighbor_cell_index(s_idx:e_idx,3)),nc_time_idx(step),:)
 
     ! update 3D input-tensor
 
@@ -227,18 +230,19 @@ program ecrad_ml
     input_3d(:,:,1,:) = from_netcdf_3d(s_idx:e_idx,:,nc_time_idx(step),:)
 
     ! neigbours
-    input_3d(:,:,2,:) = from_netcdf_3d(INT(neighbor_cell_index(s_idx:e_idx,1)),:,nc_time_idx(step),:)
-    input_3d(:,:,3,:) = from_netcdf_3d(INT(neighbor_cell_index(s_idx:e_idx,2)),:,nc_time_idx(step),:)
-    input_3d(:,:,4,:) = from_netcdf_3d(INT(neighbor_cell_index(s_idx:e_idx,3)),:,nc_time_idx(step),:)
+    !input_3d(:,:,2,:) = from_netcdf_3d(INT(neighbor_cell_index(s_idx:e_idx,1)),:,nc_time_idx(step),:)
+    !input_3d(:,:,3,:) = from_netcdf_3d(INT(neighbor_cell_index(s_idx:e_idx,2)),:,nc_time_idx(step),:)
+    !input_3d(:,:,4,:) = from_netcdf_3d(INT(neighbor_cell_index(s_idx:e_idx,3)),:,nc_time_idx(step),:)
 
 
     ! apply model
-    call infero_check(model_lw%infer(iset, oset_lw ))
-    call infero_check(model_sw%infer(iset, oset_sw ))
+    !call infero_check(model_lw%infer(iset, oset_lw ))
+    !call infero_check(model_sw%infer(iset, oset_sw ))
+    call infero_check(model%infer(iset, oset ))
 
     ! store results in permanent fields
-    swflx(:,:,:,step) = pred_swflx
-    lwflx(:,:,:,step) = pred_lwflx
+    lwflx(:,:,:,step) = pred_flx(:,:,1:2)
+    swflx(:,:,:,step) = pred_flx(:,:,3:4)
   ENDDO
 
 
@@ -330,8 +334,9 @@ program ecrad_ml
   ! CLEANUP 
 
   ! free the model
-  call infero_check(model_lw%free())
-  call infero_check(model_sw%free())
+  !call infero_check(model_lw%free())
+  !call infero_check(model_sw%free())
+  call infero_check(model%free())
 
   ! finalise infero library
   call infero_check(infero_finalise())
