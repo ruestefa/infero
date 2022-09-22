@@ -18,9 +18,9 @@ program ecrad_ml
   REAL (c_float), PARAMETER ::  rad2deg   = 180.0/pi
 
   ! define gridsize (icon grid indices)
-  !integer,parameter :: batch_size = 100
+  integer,parameter :: batch_size = 100
   !integer,parameter :: batch_size = 1000
-  integer,parameter :: batch_size = 81919
+  !integer,parameter :: batch_size = 81919
 
   ! input and output tensors
   real(c_float) :: input_3d(batch_size,60,1,6)
@@ -91,7 +91,7 @@ program ecrad_ml
 
 
   ! DEFINE PERIOD (FULL SOLAR CYCLE)
-  nsteps = 4
+  nsteps = 1
 
   timestamp(1) = "2000-12-14 00:00:00"
   timestamp(2) = "2000-12-14 06:00:00"
