@@ -72,7 +72,7 @@ TFC_VERSION=2.6.0
 TFC_SOURCE_DIR=${ROOT_SRC_DIR}/tensorflow_c
 TFC_BUILD_DIR=${ROOT_SRC_DIR}/tensorflow_c
 TFC_URL=https://storage.googleapis.com/tensorflow/libtensorflow
-TFC_TARFILE=libtensorflow-cpu-linux-x86_64-${TFC_VERSION}.tar.gz
+TFC_TARFILE=libtensorflow-gpu-linux-x86_64-${TFC_VERSION}.tar.gz
 
 # TFLITE
 TFLITE_SOURCE_DIR=${ROOT_SRC_DIR}/tensorflow
