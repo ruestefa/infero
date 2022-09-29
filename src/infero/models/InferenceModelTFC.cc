@@ -319,7 +319,7 @@ void InferenceModelTFC::check_status(const TF_Status* s, std::string name){
         //Log::info() << name << " OK" << std::endl;
     }
     else {
-        //Log::error() << name << " NOT OK" << std::endl;
+        Log::error() << name << " NOT OK" << std::endl;
         throw eckit::BadValue("Operation failed!", Here());
     }
 }
@@ -377,7 +377,7 @@ TF_Output InferenceModelTFC::GetInputOperationBuffer_(std::string name)
             inputLayerName = "serving_default_input_1";
             t1 = {TF_GraphOperationByName(network_graph, inputLayerName.c_str()), 0};
             if(!t1.oper){
-                //Log::error() << "Model input layer name : " << inputLayerName << " also not valid => aborting!" << std::endl;
+                Log::error() << "Model input layer name : " << inputLayerName << " also not valid => aborting!" << std::endl;
                 throw eckit::BadValue("Model input layer name could not be detected, "
                                       "Try assigning it through MIMO interface", Here());
             }
