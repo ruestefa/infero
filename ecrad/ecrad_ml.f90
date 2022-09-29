@@ -18,6 +18,7 @@ program ecrad_ml
   REAL (c_float), PARAMETER ::  rad2deg   = 180.0/pi
 
   ! define gridsize (icon grid indices)
+  !integer,parameter :: batch_size = 10
   !integer,parameter :: batch_size = 100
   !integer,parameter :: batch_size = 1000
   integer,parameter :: batch_size = 10000
@@ -75,9 +76,11 @@ program ecrad_ml
   call infero_check(oset%push_tensor(pred_flx, "StatefulPartitionedCall"))
 
 
+
   ! DEFINE PERIOD (FULL SOLAR CYCLE)
   nsteps = 4
 
+  ! correspond to file nr. 5
   timestamp(1) = "2000-01-29 00:00:00"
   timestamp(2) = "2000-01-29 06:00:00"
   timestamp(3) = "2000-01-29 12:00:00"
@@ -209,12 +212,41 @@ program ecrad_ml
     ! center cell
     input_3d(:,:,1,:) = from_netcdf_3d(s_idx:e_idx,:,nc_time_idx(step),:)
 
+
     ! apply model
     call infero_check(model%infer(iset, oset ))
+
+    !CALL infero_check(iset%print())
+    !CALL infero_check(oset%print())
+
 
     ! store results in permanent fields
     lwflx(:,:,:,step) = pred_flx(:,:,1:2)
     swflx(:,:,:,step) = pred_flx(:,:,3:4)
+
+    ! input
+    varname="input_clc"
+    CALL stats_2d(varname,input_3d(:,:,1,1))
+    varname="input_temp"
+    CALL stats_2d(varname,input_3d(:,:,1,2))
+    varname="input_pres"
+    CALL stats_2d(varname,input_3d(:,:,1,3))
+    varname="input_qc"
+    CALL stats_2d(varname,input_3d(:,:,1,4))
+    varname="input_qi"
+    CALL stats_2d('input_qi',input_3d(:,:,1,5))
+    varname="input_qv"
+    CALL stats_2d(varname,input_3d(:,:,1,6))
+
+    ! output
+    varname="lwflx_up"
+    CALL stats_2d(varname,pred_flx(:,:,1))
+    varname="lwflx_dn"
+    CALL stats_2d(varname,pred_flx(:,:,2))
+    varname="swflx_up"
+    CALL stats_2d(varname,pred_flx(:,:,3))
+    varname="swflx_dn"
+    CALL stats_2d(varname,pred_flx(:,:,4))
   ENDDO
 
 
@@ -322,6 +354,34 @@ program ecrad_ml
   DEALLOCATE(from_netcdf_3d)
   DEALLOCATE(from_netcdf_2d)
   DEALLOCATE(abs_diff)
+
+CONTAINS
+
+  SUBROUTINE stats_2d(varname,input)
+    use iso_c_binding, only : c_float
+    REAL(c_float), INTENT(IN) :: input(:,:)
+    CHARACTER(*) :: varname
+
+    INTEGER :: i,j
+    REAL(c_float):: mean
+
+    mean = 0.0
+    DO i=1,SIZE(input,DIM=1)
+      DO j=1,SIZE(input,DIM=2)
+        mean = mean + input(i,j)
+      ENDDO
+    ENDDO
+
+    mean = mean / REAL(i*j)
+
+    !JJ: uncomment for shape information
+    !write(message_text,*) SHAPE(input)
+    !write(message_text,'(A)') TRIM(message_text)
+    !CALL message(TRIM(varname),message_text)
+
+    write(*,'(A,A,F8.2,A,F8.2,A,F8.2)') TRIM(varname),': MEAN ',mean,' MAX ',MAXVAL(input(:,:)),' MIN ', MINVAL(input(:,:))
+
+  END SUBROUTINE stats_2d
 
 end program
 
@@ -459,3 +519,4 @@ SUBROUTINE check(istatus)
   write(*,'(A)') TRIM((nf90_strerror(istatus)))
   END IF
 END SUBROUTINE check
+
