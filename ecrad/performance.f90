@@ -1,13 +1,21 @@
 program performance
+
+  USE mpi
   implicit none
 
-  INTEGER :: total_size,n_iterations,i,data_chunk,divide_by
+  INTEGER :: total_size,n_iterations,i,data_chunk,divide_by,mpi_rank
   INTEGER,ALLOCATABLE :: nproma(:)
   REAL,ALLOCATABLE :: time(:)
 
   character(1024) :: model_path
 
-  total_size = 10000
+  INTEGER:: mpi_err,mpi_size
+
+  CALL MPI_INIT(mpi_err)
+  CALL MPI_COMM_RANK(MPI_COMM_WORLD, mpi_rank, mpi_err)
+  CALL MPI_COMM_SIZE(MPI_COMM_WORLD, mpi_size, mpi_err)
+
+  total_size = 5000
   divide_by = 10
   n_iterations = 5
 
@@ -21,19 +29,28 @@ program performance
 
   DO i=1,divide_by
     IF(i < divide_by)THEN
-      nproma(i) = 16 +(i-1)*data_chunk
+      nproma(i) = 64 +(i-1)*data_chunk
     ELSE
       nproma(i) = total_size
     ENDIF
       CALL perform_test(nproma(i),total_size,n_iterations,model_path,time(i))
   ENDDO
 
+  CALL MPI_BARRIER(MPI_COMM_WORLD, mpi_err)
+
+  CALL sleep(mpi_rank)
+  WRITE(*,'(A)') '+++++++++++++++++++++++++++++++++++++++++++++++++++'
   DO i=1,divide_by
-    WRITE(*,*) nproma(i),time(i)
+    WRITE(*,'(A,I4)') 'Timings for process: ', mpi_rank
+    WRITE(*,'(A,I6,A,F4.1)') '     nproma: ',nproma(i),' total_time: ',time(i)
   ENDDO
+  WRITE(*,'(A)') ''
 
   DEALLOCATE(nproma)
   DEALLOCATE(time)
+
+  CALL MPI_FINALIZE(mpi_err)
+
 CONTAINS
 
   SUBROUTINE perform_test(nproma,total_size,n_iterations,model_path,time)
