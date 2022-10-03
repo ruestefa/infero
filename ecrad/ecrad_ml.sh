@@ -5,13 +5,11 @@ set -eu
 datadir=$1
 eng_type=tf_c
 
-lw_model=$datadir/patch_shrNhbrWeightslvl1_all_heights_BN_mse_energyconsv1W1e-4_lw_datav2IG_SSD_MT_featNormv2/serialized_model_step_427000
-sw_model=$datadir/patch_shrNhbrWeightslvl1_all_heights_BN_mse_energyconsv1W1e-4_sw_datav2IG_SSD_MT_featNormv2/serialized_model_step_491000
+model=$datadir/patch_shrNhbrWeightslvl0_all_heights_BN_mse_datav2IG_SSD_MT_featNormv2_fit_seq_MergedLwupLwdnSwupSwdn/serialized_model_steps_182400_238640_80560_188480
 
 # run inference
 ./multiple_fields_model.exe \
-  $lw_model \
-  $sw_model \
+  $model \
   $eng_type \
 
 
