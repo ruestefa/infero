@@ -62,6 +62,7 @@ program ecrad_ml
   ! SET UP INFERO AND ASSIGN IN/OUT TENSORS
 
   ! init infero
+  write(*,'(a)') 'initialize infero'
   call infero_check(infero_initialise())
 
   ! YAML config string -> LW/SW
@@ -98,6 +99,7 @@ program ecrad_ml
   nc_time_idx(4) = 4
 
   ! fields to store model output
+  write(*,'(a)') 'allocate fields to store model output'
   ALLOCATE(swflx(batch_size, 60, 2, nsteps))
   ALLOCATE(lwflx(batch_size, 60, 2, nsteps))
 
@@ -105,9 +107,11 @@ program ecrad_ml
   icon_grid='icon_grid.nc'
 
   ! read icon grid file dimensions
+  write(*,'(a)') 'read icon grid dimensions file ' // trim(icon_grid)
   call get_nc_dims(icon_grid,grid_dim_name,grid_dim_len,14)
 
   ! fields with icon-grid information
+  write(*,'(a)') 'allocate fields with icon-grid information'
   ALLOCATE(neighbor_cell_index(grid_dim_len(1), grid_dim_len(5)))
   ALLOCATE(clat(grid_dim_len(1)))
   ALLOCATE(clon(grid_dim_len(1)))
@@ -137,13 +141,22 @@ program ecrad_ml
   netcdf_data_file='input_data.nc'
 
   ! read data dimensions
+  write(*,'(a)') 'read data dimensions from ' // trim(netcdf_data_file)
   call get_nc_dims(netcdf_data_file, dim_name, dim_len, 6)
 
+  write(*,'(A)') ''
+  do i=1,6
+    write(*,'(a,i1,a,i6)') 'dim_len(', i ,') =', dim_len(i)
+  end do
+  write(*,'(A)') ''
+
   ! fields for NetCDF data
+  write(*,'(a)') 'allocate fields for NetCDF data'
   ALLOCATE(from_netcdf_3d(dim_len(1), dim_len(3), dim_len(6), 10))
   ALLOCATE(from_netcdf_2d(dim_len(1), dim_len(6), 8))
 
   ! 2d fields
+  write(*,'(a)') 'read 2D fields'
   varname="pres_sfc"
   call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,1), dim_len(1), dim_len(6))
   varname="cosmu0"
@@ -162,6 +175,7 @@ program ecrad_ml
   call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,8), dim_len(1), dim_len(6))
 
   ! 3d fields
+  write(*,'(a)') 'read 3D fields'
   varname="clc"
   call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,1), dim_len(1), dim_len(3), dim_len(6))
   varname="temp"
@@ -189,6 +203,7 @@ program ecrad_ml
   e_idx = 1 + batch_size
 
   DO step=1,nsteps
+    write(*,'(a,i1)') 'STEP ', step
 
     ! update 2D input-tensor
 
@@ -202,16 +217,19 @@ program ecrad_ml
 
 
     ! apply model
+    write(*,'(a)') 'apply model'
     call infero_check(model%infer(iset, oset ))
 
     !CALL infero_check(iset%print())
     !CALL infero_check(oset%print())
 
     ! store results in permanent fields
+    write(*,'(a)') 'store results in permanent fields'
     lwflx(:,:,:,step) = pred_flx(:,:,1:2)
     swflx(:,:,:,step) = pred_flx(:,:,3:4)
 
     ! input
+    write(*,'(a)') 'compute stats of input vars'
     varname="input_clc"
     CALL stats_2d(varname, input_3d(:,:,1,1))
     varname="input_temp"
@@ -226,6 +244,7 @@ program ecrad_ml
     CALL stats_2d(varname, input_3d(:,:,1,6))
 
     ! output
+    write(*,'(a)') 'compute stats of output vars'
     varname="lwflx_up"
     CALL stats_2d(varname, pred_flx(:,:,1))
     varname="lwflx_dn"
@@ -404,6 +423,7 @@ SUBROUTINE read_nc_3d(infile,varname,idata,nx,ny,nz)
   INTEGER(KIND=4), DIMENSION(3) :: dimids
   INTEGER(KIND=4) :: ncid, ndims, varid
   CHARACTER(LEN=1024), INTENT(IN) :: infile,varname
+  write(*,'(a)') 'read_nc_3d'
   !Open netCDF file
   !:-------:-------:-------:-------:-------:-------:-------:-------:
   CALL check(nf90_open(TRIM(infile), nf90_nowrite, ncid))
@@ -415,9 +435,13 @@ SUBROUTINE read_nc_3d(infile,varname,idata,nx,ny,nz)
   CALL check(nf90_inquire_variable(ncid=ncid,varid=varid,ndims=ndims))
   CALL check(nf90_inquire_variable(ncid=ncid,varid=varid,ndims=ndims,dimids=dimids))
 
-  write(*,'(A)') TRIM(varname)
-  write(*,'(A,I2)') '   ndims:',ndims
-  write(*,*) '   dimids:',dimids
+  write(*,'(A)')     ' infile  : ' // TRIM(infile)
+  write(*,'(A)')     ' varname : ' // TRIM(varname)
+  write(*,'(A,I6)')  ' nx      : ', nx
+  write(*,'(A,I6)')  ' ny      : ', ny
+  write(*,'(A,I6)')  ' nz      : ', nz
+  write(*,'(A,I6)')  ' ndims   : ', ndims
+  write(*,'(A,3I6)') ' dimids  : ', dimids
 
   CALL check(nf90_get_var(ncid,varid,idata))
   !Close netCDF file
@@ -435,15 +459,18 @@ SUBROUTINE read_nc_1d(infile,varname,idata,nx)
   INTEGER(KIND=4), DIMENSION(1) :: dimids
   INTEGER(KIND=4) :: ncid, ndims, varid
   CHARACTER(LEN=1024), INTENT(IN) :: infile,varname
+  write(*,'(a)') 'read_nc_1d'
   !Open netCDF file
   !:-------:-------:-------:-------:-------:-------:-------:-------:
   CALL check(nf90_open(TRIM(infile), nf90_nowrite, ncid))
   CALL check(nf90_inq_varid(ncid,TRIM(varname),varid))
   CALL check(nf90_inquire_variable(ncid=ncid,varid=varid,ndims=ndims,dimids=dimids))
 
-  write(*,'(A)') TRIM(varname)
-  write(*,'(A,I2)') '   ndims:',ndims
-  write(*,*) '   dimids:',dimids
+  write(*,'(A)')     ' infile  : ' // TRIM(infile)
+  write(*,'(A)')     ' varname : ' // TRIM(varname)
+  write(*,'(A,I6)')  ' nx      : ', nx
+  write(*,'(A,I6)')  ' ndims   : ', ndims
+  write(*,'(A,1I6)') ' dimids  : ', dimids
 
   CALL check(nf90_get_var(ncid,varid,idata))
   !Close netCDF file
@@ -461,15 +488,19 @@ SUBROUTINE read_nc_2d(infile,varname,idata,nx,ny)
   INTEGER(KIND=4), DIMENSION(2) :: dimids
   INTEGER(KIND=4) :: ncid, ndims, varid
   CHARACTER(LEN=1024), INTENT(IN) :: infile,varname
+  write(*,'(a)') 'read_nc_2d'
   !Open netCDF file
   !:-------:-------:-------:-------:-------:-------:-------:-------:
   CALL check(nf90_open(TRIM(infile), nf90_nowrite, ncid))
   CALL check(nf90_inq_varid(ncid,TRIM(varname),varid))
   CALL check(nf90_inquire_variable(ncid=ncid,varid=varid,ndims=ndims,dimids=dimids))
 
-  write(*,'(A)') TRIM(varname)
-  write(*,'(A,I2)') '   ndims:',ndims
-  write(*,*) '   dimids:',dimids
+  write(*,'(A)')     ' infile  : ' // TRIM(infile)
+  write(*,'(A)')     ' varname : ' // TRIM(varname)
+  write(*,'(A,I6)')  ' nx      : ', nx
+  write(*,'(A,I6)')  ' ny      : ', ny
+  write(*,'(A,I6)')  ' ndims   : ', ndims
+  write(*,'(A,2I6)') ' dimids  : ', dimids
 
   CALL check(nf90_get_var(ncid,varid,idata))
   !Close netCDF file
@@ -502,7 +533,7 @@ SUBROUTINE check(istatus)
   use netcdf
   INTEGER, INTENT (IN) :: istatus
   IF (istatus /= nf90_noerr) THEN
-  write(*,'(A)') TRIM((nf90_strerror(istatus)))
+    write(*,'(A)') 'ERROR: '//TRIM((nf90_strerror(istatus)))
   END IF
 END SUBROUTINE check
 
