@@ -36,22 +36,30 @@ program ecrad_ml
   integer :: dim_len(6),grid_dim_len(14)
 
   ! indices
-  integer :: step, nsteps, s_idx,e_idx, nc_time_idx(4),i,k,id_d, counter(4)
+  integer :: i, k, id_d
+  integer :: step, nsteps, s_idx, e_idx
+  integer :: nc_time_idx(4)
+  integer :: counter(4)
 
   ! data fields
-  real(c_float), allocatable :: from_netcdf_3d(:,:,:,:), from_netcdf_2d(:,:,:), neighbor_cell_index(:,:), abs_diff(:,:,:,:)
-  real(c_float), allocatable :: swflx(:,:,:,:), lwflx(:,:,:,:)
-  real(c_float), allocatable :: clat(:), clon(:),lon(:),lat(:)
-  real(c_float):: mean_absolute_error(4,4)
+  real(c_float), allocatable :: from_netcdf_3d(:,:,:,:)
+  real(c_float), allocatable :: from_netcdf_2d(:,:,:)
+  real(c_float), allocatable :: neighbor_cell_index(:,:)
+  real(c_float), allocatable :: abs_diff(:,:,:,:)
+  real(c_float), allocatable :: swflx(:,:,:,:)
+  real(c_float), allocatable :: lwflx(:,:,:,:)
+  real(c_float), allocatable :: clat(:), clon(:)
+  real(c_float), allocatable :: lat(:), lon(:)
+  real(c_float) :: mean_absolute_error(nflxs,nsteps)
 
   ! scalars
-  real(c_float) :: percentage, lat_min,lat_max,lon_min,lon_max
+  real(c_float) :: percentage, lat_min, lat_max, lon_min, lon_max
 
   ! Get CL arguments
   CALL get_command_argument(1, model_path)
   CALL get_command_argument(2, model_type)
 
-  ! SETUP INFERO AND ASSIGN IN/OUT TENSORS
+  ! SET UP INFERO AND ASSIGN IN/OUT TENSORS
 
   ! init infero
   call infero_check(infero_initialise())
@@ -75,11 +83,8 @@ program ecrad_ml
 
   call infero_check(oset%push_tensor(pred_flx, "StatefulPartitionedCall"))
 
-
-
   ! DEFINE PERIOD (FULL SOLAR CYCLE)
   nsteps = 4
-
   ! correspond to file nr. 5
   timestamp(1) = "2000-01-29 00:00:00"
   timestamp(2) = "2000-01-29 06:00:00"
@@ -93,8 +98,8 @@ program ecrad_ml
   nc_time_idx(4) = 4
 
   ! fields to store model output
-  ALLOCATE(swflx(batch_size,60,2,nsteps))
-  ALLOCATE(lwflx(batch_size,60,2,nsteps))
+  ALLOCATE(swflx(batch_size, 60, 2, nsteps))
+  ALLOCATE(lwflx(batch_size, 60, 2, nsteps))
 
   ! READ-IN ICON GRID INFORMATION AND COMPUTE DOMAIN EXTENT
   icon_grid='icon_grid.nc'
@@ -103,19 +108,19 @@ program ecrad_ml
   call get_nc_dims(icon_grid,grid_dim_name,grid_dim_len,14)
 
   ! fields with icon-grid information
-  ALLOCATE(neighbor_cell_index(grid_dim_len(1),grid_dim_len(5)))
+  ALLOCATE(neighbor_cell_index(grid_dim_len(1), grid_dim_len(5)))
   ALLOCATE(clat(grid_dim_len(1)))
   ALLOCATE(clon(grid_dim_len(1)))
   ALLOCATE(lat(batch_size + 1))
   ALLOCATE(lon(batch_size + 1))
 
   varname="neighbor_cell_index"
-  call read_nc_2d(icon_grid,varname,neighbor_cell_index(:,:),grid_dim_len(1),grid_dim_len(5))
+  call read_nc_2d(icon_grid, varname, neighbor_cell_index(:,:), grid_dim_len(1), grid_dim_len(5))
 
   varname="clat"
-  call read_nc_1d(icon_grid,varname,clat,grid_dim_len(1))
+  call read_nc_1d(icon_grid, varname, clat, grid_dim_len(1))
   varname="clon"
-  call read_nc_1d(icon_grid,varname,clon,grid_dim_len(1))
+  call read_nc_1d(icon_grid, varname, clon, grid_dim_len(1))
 
   ! compute domain extent
   DO i=1,batch_size+1
@@ -128,72 +133,55 @@ program ecrad_ml
   lat_max = MAXVAL(lat(:))
   lat_min = MINVAL(lat(:))
 
-
-  ! READ-IN INPUT-DATA FOR MODEL
+  ! READ INPUT DATA FOR MODEL
   netcdf_data_file='input_data.nc'
 
   ! read data dimensions
-  call get_nc_dims(netcdf_data_file,dim_name,dim_len,6)
+  call get_nc_dims(netcdf_data_file, dim_name, dim_len, 6)
 
   ! fields for NetCDF data
-  ALLOCATE(from_netcdf_3d(dim_len(1),dim_len(3),dim_len(6),10))
-  ALLOCATE(from_netcdf_2d(dim_len(1),dim_len(6),8))
+  ALLOCATE(from_netcdf_3d(dim_len(1), dim_len(3), dim_len(6), 10))
+  ALLOCATE(from_netcdf_2d(dim_len(1), dim_len(6), 8))
 
   ! 2d fields
   varname="pres_sfc"
-  call read_nc_2d(netcdf_data_file,varname,from_netcdf_2d(:,:,1),dim_len(1),dim_len(6))
-
+  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,1), dim_len(1), dim_len(6))
   varname="cosmu0"
-  call read_nc_2d(netcdf_data_file,varname,from_netcdf_2d(:,:,2),dim_len(1),dim_len(6))
-
+  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,2), dim_len(1), dim_len(6))
   varname="qv_s"
-  call read_nc_2d(netcdf_data_file,varname,from_netcdf_2d(:,:,3),dim_len(1),dim_len(6))
-
+  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,3), dim_len(1), dim_len(6))
   varname="albvisdir"
-  call read_nc_2d(netcdf_data_file,varname,from_netcdf_2d(:,:,4),dim_len(1),dim_len(6))
-
+  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,4), dim_len(1), dim_len(6))
   varname="albnirdir"
-  call read_nc_2d(netcdf_data_file,varname,from_netcdf_2d(:,:,5),dim_len(1),dim_len(6))
-
+  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,5), dim_len(1), dim_len(6))
   varname="tsfctrad"
-  call read_nc_2d(netcdf_data_file,varname,from_netcdf_2d(:,:,6),dim_len(1),dim_len(6))
-
+  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,6), dim_len(1), dim_len(6))
   varname="albvisdif"
-  call read_nc_2d(netcdf_data_file,varname,from_netcdf_2d(:,:,7),dim_len(1),dim_len(6))
-
+  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,7), dim_len(1), dim_len(6))
   varname="albnirdif"
-  call read_nc_2d(netcdf_data_file,varname,from_netcdf_2d(:,:,8),dim_len(1),dim_len(6))
+  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,8), dim_len(1), dim_len(6))
 
   ! 3d fields
   varname="clc"
-  call read_nc_3d(netcdf_data_file,varname,from_netcdf_3d(:,:,:,1),dim_len(1),dim_len(3),dim_len(6))
-
+  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,1), dim_len(1), dim_len(3), dim_len(6))
   varname="temp"
-  call read_nc_3d(netcdf_data_file,varname,from_netcdf_3d(:,:,:,2),dim_len(1),dim_len(3),dim_len(6))
-
+  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,2), dim_len(1), dim_len(3), dim_len(6))
   varname="pres"
-  call read_nc_3d(netcdf_data_file,varname,from_netcdf_3d(:,:,:,3),dim_len(1),dim_len(3),dim_len(6))
-
+  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,3), dim_len(1), dim_len(3), dim_len(6))
   varname="qc"
-  call read_nc_3d(netcdf_data_file,varname,from_netcdf_3d(:,:,:,4),dim_len(1),dim_len(3),dim_len(6))
-
+  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,4), dim_len(1), dim_len(3), dim_len(6))
   varname="qi"
-  call read_nc_3d(netcdf_data_file,varname,from_netcdf_3d(:,:,:,5),dim_len(1),dim_len(3),dim_len(6))
-
+  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,5), dim_len(1), dim_len(3), dim_len(6))
   varname="qv"
-  call read_nc_3d(netcdf_data_file,varname,from_netcdf_3d(:,:,:,6),dim_len(1),dim_len(3),dim_len(6))
-
+  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,6), dim_len(1), dim_len(3), dim_len(6))
   varname="lwflx_up"
-  call read_nc_3d(netcdf_data_file,varname,from_netcdf_3d(:,:,:,7),dim_len(1),dim_len(3),dim_len(6))
-
+  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,7), dim_len(1), dim_len(3), dim_len(6))
   varname="lwflx_dn"
-  call read_nc_3d(netcdf_data_file,varname,from_netcdf_3d(:,:,:,8),dim_len(1),dim_len(3),dim_len(6))
-
+  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,8), dim_len(1), dim_len(3), dim_len(6))
   varname="swflx_up"
-  call read_nc_3d(netcdf_data_file,varname,from_netcdf_3d(:,:,:,9),dim_len(1),dim_len(3),dim_len(6))
-
+  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,9), dim_len(1), dim_len(3), dim_len(6))
   varname="swflx_dn"
-  call read_nc_3d(netcdf_data_file,varname,from_netcdf_3d(:,:,:,10),dim_len(1),dim_len(3),dim_len(6))
+  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,10), dim_len(1), dim_len(3), dim_len(6))
 
 
   ! TIMESTEP
@@ -205,12 +193,12 @@ program ecrad_ml
     ! update 2D input-tensor
 
     ! center cell
-    input_2d(:,1,:) = from_netcdf_2d(s_idx:e_idx,nc_time_idx(step),:)
+    input_2d(:,1,:) = from_netcdf_2d(s_idx:e_idx, nc_time_idx(step), :)
 
     ! update 3D input-tensor
 
     ! center cell
-    input_3d(:,:,1,:) = from_netcdf_3d(s_idx:e_idx,:,nc_time_idx(step),:)
+    input_3d(:,:,1,:) = from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), :)
 
 
     ! apply model
@@ -219,34 +207,33 @@ program ecrad_ml
     !CALL infero_check(iset%print())
     !CALL infero_check(oset%print())
 
-
     ! store results in permanent fields
     lwflx(:,:,:,step) = pred_flx(:,:,1:2)
     swflx(:,:,:,step) = pred_flx(:,:,3:4)
 
     ! input
     varname="input_clc"
-    CALL stats_2d(varname,input_3d(:,:,1,1))
+    CALL stats_2d(varname, input_3d(:,:,1,1))
     varname="input_temp"
-    CALL stats_2d(varname,input_3d(:,:,1,2))
+    CALL stats_2d(varname, input_3d(:,:,1,2))
     varname="input_pres"
-    CALL stats_2d(varname,input_3d(:,:,1,3))
+    CALL stats_2d(varname, input_3d(:,:,1,3))
     varname="input_qc"
-    CALL stats_2d(varname,input_3d(:,:,1,4))
+    CALL stats_2d(varname, input_3d(:,:,1,4))
     varname="input_qi"
-    CALL stats_2d('input_qi',input_3d(:,:,1,5))
+    CALL stats_2d(varname, input_3d(:,:,1,5))
     varname="input_qv"
-    CALL stats_2d(varname,input_3d(:,:,1,6))
+    CALL stats_2d(varname, input_3d(:,:,1,6))
 
     ! output
     varname="lwflx_up"
-    CALL stats_2d(varname,pred_flx(:,:,1))
+    CALL stats_2d(varname, pred_flx(:,:,1))
     varname="lwflx_dn"
-    CALL stats_2d(varname,pred_flx(:,:,2))
+    CALL stats_2d(varname, pred_flx(:,:,2))
     varname="swflx_up"
-    CALL stats_2d(varname,pred_flx(:,:,3))
+    CALL stats_2d(varname, pred_flx(:,:,3))
     varname="swflx_dn"
-    CALL stats_2d(varname,pred_flx(:,:,4))
+    CALL stats_2d(varname, pred_flx(:,:,4))
   ENDDO
 
 
@@ -281,26 +268,26 @@ program ecrad_ml
     write(*,'(F6.1,A,A)') percentage, '% values below 0.0 for ',timestamp(step)
   ENDDO
 
-  ! absolute difference 
-  ALLOCATE(abs_diff(batch_size+1,dim_len(3),dim_len(6),4))
+  ! absolute difference
+  ALLOCATE(abs_diff(batch_size+1, dim_len(3), dim_len(6), 4))
 
   write(*,'(A)') ''
   write(*,'(A)') '  Mean Absolute Error (MAE):'
   DO step=1,nsteps
     ! lwflux_up
-    abs_diff(:,:,1,step) = ABS(lwflx(:,:,1,step) - from_netcdf_3d(s_idx:e_idx,:,nc_time_idx(step),7))
+    abs_diff(:,:,1,step) = ABS(lwflx(:,:,1,step) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 7))
     ! lwflux_dn
-    abs_diff(:,:,2,step) = ABS(lwflx(:,:,2,step) - from_netcdf_3d(s_idx:e_idx,:,nc_time_idx(step),8))
+    abs_diff(:,:,2,step) = ABS(lwflx(:,:,2,step) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 8))
     ! swflux_up
-    abs_diff(:,:,3,step) = ABS(swflx(:,:,1,step) - from_netcdf_3d(s_idx:e_idx,:,nc_time_idx(step),9))
+    abs_diff(:,:,3,step) = ABS(swflx(:,:,1,step) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 9))
     ! swflux_dn
-    abs_diff(:,:,4,step) = ABS(swflx(:,:,2,step) - from_netcdf_3d(s_idx:e_idx,:,nc_time_idx(step),10))
+    abs_diff(:,:,4,step) = ABS(swflx(:,:,2,step) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 10))
 
     ! mean values
-    CALL mean_2d(abs_diff(:,:,1,step), mean_absolute_error(1,step),batch_size,60)
-    CALL mean_2d(abs_diff(:,:,2,step), mean_absolute_error(2,step),batch_size,60)
-    CALL mean_2d(abs_diff(:,:,3,step), mean_absolute_error(3,step),batch_size,60)
-    CALL mean_2d(abs_diff(:,:,4,step), mean_absolute_error(4,step),batch_size,60)
+    CALL mean_2d(abs_diff(:,:,1,step), mean_absolute_error(1,step), batch_size, 60)
+    CALL mean_2d(abs_diff(:,:,2,step), mean_absolute_error(2,step), batch_size, 60)
+    CALL mean_2d(abs_diff(:,:,3,step), mean_absolute_error(3,step), batch_size, 60)
+    CALL mean_2d(abs_diff(:,:,4,step), mean_absolute_error(4,step), batch_size, 60)
 
     write(*,'(A)') ''
     write(*,'(A,A)') '    ',timestamp(step)
@@ -335,7 +322,7 @@ program ecrad_ml
   ENDDO
 
 
-  ! CLEANUP 
+  ! CLEANUP
 
   ! free the model
   call infero_check(model%free())
@@ -513,7 +500,6 @@ END SUBROUTINE mean_2d
 
 SUBROUTINE check(istatus)
   use netcdf
-
   INTEGER, INTENT (IN) :: istatus
   IF (istatus /= nf90_noerr) THEN
   write(*,'(A)') TRIM((nf90_strerror(istatus)))
