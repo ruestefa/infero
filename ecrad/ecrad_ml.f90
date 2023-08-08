@@ -23,23 +23,24 @@ program ecrad_ml
   !integer,parameter :: batch_size = 1000
   integer,parameter :: batch_size = 10000
   !integer,parameter :: batch_size = 81919
+  integer, parameter :: nsteps = 4
 
   ! input and output tensors
   real(c_float) :: input_3d(batch_size, 60, 1, 6)
   real(c_float) :: input_2d(batch_size, 1, 8)
-  real(c_float) ::  pred_flx(batch_size, 60, 4)
+  real(c_float) ::  pred_flx(batch_size, 60, nsteps)
 
   ! netcdf
   character(1024) :: netcdf_data_file,varname,icon_grid
   character(50) :: dim_name(6), grid_dim_name(14)
-  character(19) :: timestamp(4)
+  character(19) :: timestamp(nsteps)
   integer :: dim_len(6), grid_dim_len(14)
 
   ! indices
   integer :: i, k, id_d
-  integer :: step, nsteps, s_idx, e_idx
-  integer :: nc_time_idx(4)
-  integer :: counter(4)
+  integer :: step, s_idx, e_idx
+  integer :: nc_time_idx(nsteps)
+  integer :: counter(nsteps)
 
   ! data fields
   real(c_float), allocatable :: from_netcdf_3d(:,:,:,:)
@@ -85,7 +86,6 @@ program ecrad_ml
   call infero_check(oset%push_tensor(pred_flx, "StatefulPartitionedCall"))
 
   ! DEFINE PERIOD (FULL SOLAR CYCLE)
-  nsteps = 4
   ! correspond to file nr. 5
   timestamp(1) = "2000-01-29 00:00:00"
   timestamp(2) = "2000-01-29 06:00:00"
@@ -100,8 +100,8 @@ program ecrad_ml
 
   ! fields to store model output
   write(*,'(a)') 'allocate fields to store model output'
-  ALLOCATE(swflx(batch_size, 60, 2, nsteps))
-  ALLOCATE(lwflx(batch_size, 60, 2, nsteps))
+  ALLOCATE(swflx(batch_size, 60, 2, nsteps))  ! SR/TODO make regular arrays (nsteps is now a parameter)
+  ALLOCATE(lwflx(batch_size, 60, 2, nsteps))  ! SR/TODO make regular arrays (nsteps is now a parameter)
 
   ! READ-IN ICON GRID INFORMATION AND COMPUTE DOMAIN EXTENT
   icon_grid='icon_grid.nc'
