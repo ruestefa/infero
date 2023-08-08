@@ -25,6 +25,9 @@ program ecrad_ml
   !integer,parameter :: batch_size = 81919
   integer, parameter :: nsteps = 4
 
+  ! input dimensions
+  integer, parameter :: ndims = 6
+
   ! input and output tensors
   real(c_float) :: input_3d(batch_size, 60, 1, 6)
   real(c_float) :: input_2d(batch_size, 1, 8)
@@ -32,9 +35,9 @@ program ecrad_ml
 
   ! netcdf
   character(1024) :: netcdf_data_file,varname,icon_grid
-  character(50) :: dim_name(6), grid_dim_name(14)
+  character(50) :: dim_name(ndims), grid_dim_name(14)
   character(19) :: timestamp(nsteps)
-  integer :: dim_len(6), grid_dim_len(14)
+  integer :: dim_len(ndims), grid_dim_len(14)
 
   ! indices
   integer :: i, k, id_d
@@ -142,10 +145,10 @@ program ecrad_ml
 
   ! read data dimensions
   write(*,'(a)') 'read data dimensions from ' // trim(netcdf_data_file)
-  call get_nc_dims(netcdf_data_file, dim_name, dim_len, 6)
+  call get_nc_dims(netcdf_data_file, dim_name, dim_len, ndims)
 
   write(*,'(A)') ''
-  do i=1,6
+  do i=1,ndims
     write(*,'(a,i1,a,i6)') 'dim_len(', i ,') =', dim_len(i)
   end do
   write(*,'(A)') ''
