@@ -17,6 +17,8 @@ program ecrad_ml
   REAL (c_float), PARAMETER ::  pi = 3.14159265358979323846264338327950288
   REAL (c_float), PARAMETER ::  rad2deg   = 180.0/pi
 
+  ! SR/TODO Try reading these params from the input file instead of hardcoding them
+  ! SR/TODO Should just require swapping out the regular arrays for allocatables
   ! define gridsize (icon grid indices)
   !integer,parameter :: batch_size = 10
   !integer,parameter :: batch_size = 100
