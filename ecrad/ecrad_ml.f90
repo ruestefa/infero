@@ -25,6 +25,7 @@ program ecrad_ml
   !integer,parameter :: batch_size = 81919
   integer, parameter :: nlev = 70
   integer, parameter :: nsteps = 4
+  integer, parameter :: nflxs = 4
 
   ! input dimensions
   integer, parameter :: ndims = 6
@@ -292,7 +293,7 @@ program ecrad_ml
   ENDDO
 
   ! absolute difference
-  ALLOCATE(abs_diff(batch_size+1, dim_len(3), dim_len(6), 4))
+  ALLOCATE(abs_diff(batch_size+1, dim_len(3), dim_len(6), nflxs))
 
   write(*,'(A)') ''
   write(*,'(A)') '  Mean Absolute Error (MAE):'
