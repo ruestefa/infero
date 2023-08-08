@@ -31,6 +31,12 @@ program ecrad_ml
 
   ! input dimensions
   integer, parameter :: ndims = 6
+  integer, parameter :: idim_ncells = 1
+  integer, parameter :: idim_vertices = 2
+  integer, parameter :: idim_height = 3
+  integer, parameter :: idim_bnds = 4
+  integer, parameter :: idim_height_2 = 5
+  integer, parameter :: idim_time = 6
 
   ! input and output tensors
   real(c_float) :: input_3d(batch_size, nlev, 1, nvars_3d-2)  ! SR/TODO sure nvars_3d-2 is correct? Why -2?
@@ -156,53 +162,60 @@ program ecrad_ml
     write(*,'(a,i1,a,i6)') 'dim_len(', i ,') =', dim_len(i)
   end do
   write(*,'(A)') ''
+  write(*,'(a,i6)') 'dim_len(idim_ncells  ) = ', dim_len(idim_ncells)
+  write(*,'(a,i6)') 'dim_len(idim_vertices) = ', dim_len(idim_vertices)
+  write(*,'(a,i6)') 'dim_len(idim_height  ) = ', dim_len(idim_height)
+  write(*,'(a,i6)') 'dim_len(idim_bnds    ) = ', dim_len(idim_bnds)
+  write(*,'(a,i6)') 'dim_len(idim_height_2) = ', dim_len(idim_height_2)
+  write(*,'(a,i6)') 'dim_len(idim_time    ) = ', dim_len(idim_time)
+  write(*,'(A)') ''
 
   ! fields for NetCDF data
   write(*,'(a)') 'allocate fields for NetCDF data'
-  ALLOCATE(from_netcdf_3d(dim_len(1), dim_len(3), dim_len(6), nvars_2d))
-  ALLOCATE(from_netcdf_2d(dim_len(1), dim_len(6), nvars_3d))
+  ALLOCATE(from_netcdf_3d(dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time), nvars_2d))
+  ALLOCATE(from_netcdf_2d(dim_len(idim_ncells), dim_len(idim_time), nvars_3d))
 
   ! 2d fields
   write(*,'(a)') 'read 2D fields'
   varname="pres_sfc"
-  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,1), dim_len(1), dim_len(6))
+  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,1), dim_len(idim_ncells), dim_len(idim_time))
   varname="cosmu0"
-  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,2), dim_len(1), dim_len(6))
+  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,2), dim_len(idim_ncells), dim_len(idim_time))
   varname="qv_s"
-  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,3), dim_len(1), dim_len(6))
+  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,3), dim_len(idim_ncells), dim_len(idim_time))
   varname="albvisdir"
-  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,4), dim_len(1), dim_len(6))
+  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,4), dim_len(idim_ncells), dim_len(idim_time))
   varname="albnirdir"
-  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,5), dim_len(1), dim_len(6))
+  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,5), dim_len(idim_ncells), dim_len(idim_time))
   varname="tsfctrad"
-  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,6), dim_len(1), dim_len(6))
+  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,6), dim_len(idim_ncells), dim_len(idim_time))
   varname="albvisdif"
-  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,7), dim_len(1), dim_len(6))
+  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,7), dim_len(idim_ncells), dim_len(idim_time))
   varname="albnirdif"
-  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,8), dim_len(1), dim_len(6))
+  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,8), dim_len(idim_ncells), dim_len(idim_time))
 
   ! 3d fields
   write(*,'(a)') 'read 3D fields'
   varname="clc"
-  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,1), dim_len(1), dim_len(3), dim_len(6))
+  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,1), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
   varname="temp"
-  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,2), dim_len(1), dim_len(3), dim_len(6))
+  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,2), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
   varname="pres"
-  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,3), dim_len(1), dim_len(3), dim_len(6))
+  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,3), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
   varname="qc"
-  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,4), dim_len(1), dim_len(3), dim_len(6))
+  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,4), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
   varname="qi"
-  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,5), dim_len(1), dim_len(3), dim_len(6))
+  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,5), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
   varname="qv"
-  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,6), dim_len(1), dim_len(3), dim_len(6))
+  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,6), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
   varname="lwflx_up"
-  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,7), dim_len(1), dim_len(3), dim_len(6))
+  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,7), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
   varname="lwflx_dn"
-  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,8), dim_len(1), dim_len(3), dim_len(6))
+  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,8), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
   varname="swflx_up"
-  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,9), dim_len(1), dim_len(3), dim_len(6))
+  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,9), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
   varname="swflx_dn"
-  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,10), dim_len(1), dim_len(3), dim_len(6))
+  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,10), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
 
 
   ! TIMESTEP
@@ -295,7 +308,7 @@ program ecrad_ml
   ENDDO
 
   ! absolute difference
-  ALLOCATE(abs_diff(batch_size+1, dim_len(3), dim_len(6), nflxs))
+  ALLOCATE(abs_diff(batch_size+1, dim_len(idim_time), dim_len(idim_height), nflxs))
 
   write(*,'(A)') ''
   write(*,'(A)') '  Mean Absolute Error (MAE):'
