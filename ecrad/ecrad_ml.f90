@@ -26,13 +26,15 @@ program ecrad_ml
   integer, parameter :: nlev = 70
   integer, parameter :: nsteps = 4
   integer, parameter :: nflxs = 4
+  integer, parameter :: nvars_2d = 10
+  integer, parameter :: nvars_3d = 8
 
   ! input dimensions
   integer, parameter :: ndims = 6
 
   ! input and output tensors
-  real(c_float) :: input_3d(batch_size, nlev, 1, 6)
-  real(c_float) :: input_2d(batch_size, 1, 8)
+  real(c_float) :: input_3d(batch_size, nlev, 1, nvars_3d-2)  ! SR/TODO sure nvars_3d-2 is correct? Why -2?
+  real(c_float) :: input_2d(batch_size, 1, nvars_2d-2)  ! SR/TODO sure nvars_2d-2 is correct? Why -2?
   real(c_float) ::  pred_flx(batch_size, nlev, nsteps)
 
   ! netcdf
@@ -157,8 +159,8 @@ program ecrad_ml
 
   ! fields for NetCDF data
   write(*,'(a)') 'allocate fields for NetCDF data'
-  ALLOCATE(from_netcdf_3d(dim_len(1), dim_len(3), dim_len(6), 10))
-  ALLOCATE(from_netcdf_2d(dim_len(1), dim_len(6), 8))
+  ALLOCATE(from_netcdf_3d(dim_len(1), dim_len(3), dim_len(6), nvars_2d))
+  ALLOCATE(from_netcdf_2d(dim_len(1), dim_len(6), nvars_3d))
 
   ! 2d fields
   write(*,'(a)') 'read 2D fields'
