@@ -23,15 +23,16 @@ program ecrad_ml
   !integer,parameter :: batch_size = 1000
   integer,parameter :: batch_size = 10000
   !integer,parameter :: batch_size = 81919
+  integer, parameter :: nlev = 70
   integer, parameter :: nsteps = 4
 
   ! input dimensions
   integer, parameter :: ndims = 6
 
   ! input and output tensors
-  real(c_float) :: input_3d(batch_size, 60, 1, 6)
+  real(c_float) :: input_3d(batch_size, nlev, 1, 6)
   real(c_float) :: input_2d(batch_size, 1, 8)
-  real(c_float) ::  pred_flx(batch_size, 60, nsteps)
+  real(c_float) ::  pred_flx(batch_size, nlev, nsteps)
 
   ! netcdf
   character(1024) :: netcdf_data_file,varname,icon_grid
@@ -103,8 +104,8 @@ program ecrad_ml
 
   ! fields to store model output
   write(*,'(a)') 'allocate fields to store model output'
-  ALLOCATE(swflx(batch_size, 60, 2, nsteps))  ! SR/TODO make regular arrays (nsteps is now a parameter)
-  ALLOCATE(lwflx(batch_size, 60, 2, nsteps))  ! SR/TODO make regular arrays (nsteps is now a parameter)
+  ALLOCATE(swflx(batch_size, nlev, 2, nsteps))  ! SR/TODO make regular arrays (nsteps is now a parameter)
+  ALLOCATE(lwflx(batch_size, nlev, 2, nsteps))  ! SR/TODO make regular arrays (nsteps is now a parameter)
 
   ! READ-IN ICON GRID INFORMATION AND COMPUTE DOMAIN EXTENT
   icon_grid='icon_grid.nc'
@@ -274,7 +275,7 @@ program ecrad_ml
   counter(:) = 0
   DO step=1,nsteps
     DO i=1,batch_size
-      DO k=1,60
+      DO k=1,nlev
         DO id_d=1,2
           IF(swflx(i,k,id_d,step) < 0.0) THEN
             counter(step) = counter(step) + 1
@@ -284,9 +285,9 @@ program ecrad_ml
     ENDDO
   ENDDO
 
-  write(*,'(I7,A)') batch_size*60*2,' datapoints scanned for each step of SW-flux'
+  write(*,'(I7,A)') batch_size*nlev*2,' datapoints scanned for each step of SW-flux'
   DO step=1,nsteps
-    percentage = MAX(0.0,100.0 * REAL(counter(step))/REAL((batch_size*60*2)))
+    percentage = MAX(0.0,100.0 * REAL(counter(step))/REAL((batch_size*nlev*2)))
     write(*,'(F6.1,A,A)') percentage, '% values below 0.0 for ',timestamp(step)
   ENDDO
 
@@ -306,10 +307,10 @@ program ecrad_ml
     abs_diff(:,:,4,step) = ABS(swflx(:,:,2,step) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 10))
 
     ! mean values
-    CALL mean_2d(abs_diff(:,:,1,step), mean_absolute_error(1,step), batch_size, 60)
-    CALL mean_2d(abs_diff(:,:,2,step), mean_absolute_error(2,step), batch_size, 60)
-    CALL mean_2d(abs_diff(:,:,3,step), mean_absolute_error(3,step), batch_size, 60)
-    CALL mean_2d(abs_diff(:,:,4,step), mean_absolute_error(4,step), batch_size, 60)
+    CALL mean_2d(abs_diff(:,:,1,step), mean_absolute_error(1,step), batch_size, nlev)
+    CALL mean_2d(abs_diff(:,:,2,step), mean_absolute_error(2,step), batch_size, nlev)
+    CALL mean_2d(abs_diff(:,:,3,step), mean_absolute_error(3,step), batch_size, nlev)
+    CALL mean_2d(abs_diff(:,:,4,step), mean_absolute_error(4,step), batch_size, nlev)
 
     write(*,'(A)') ''
     write(*,'(A,A)') '    ',timestamp(step)
