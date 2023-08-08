@@ -39,9 +39,9 @@ program ecrad_ml
   integer, parameter :: idim_height_2 = 6
 
   ! input and output tensors
-  real(c_float) :: input_3d(batch_size, nlev, 1, nvars_3d-2)  ! SR/TODO sure nvars_3d-2 is correct? Why -2?
-  real(c_float) :: input_2d(batch_size, 1, nvars_2d-2)  ! SR/TODO sure nvars_2d-2 is correct? Why -2?
-  real(c_float) ::  pred_flx(batch_size, nlev, nsteps)
+  real(c_float) :: input_3d(batch_size, nlev, 1, nvars_3d-2)  ! SR/TODO Why not batch_size+1? Why nvars_3d-2?
+  real(c_float) :: input_2d(batch_size, 1, nvars_2d-2)        ! SR/TODO Why not batch_size+1? Why nvars_2d-2?
+  real(c_float) ::  pred_flx(batch_size, nlev, nsteps)        ! SR/TODO Why not batch_size+1?
 
   ! netcdf
   character(1024) :: netcdf_data_file,varname,icon_grid
