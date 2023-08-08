@@ -25,15 +25,15 @@ program ecrad_ml
   !integer,parameter :: batch_size = 81919
 
   ! input and output tensors
-  real(c_float) :: input_3d(batch_size,60,1,6)
-  real(c_float) :: input_2d(batch_size,1,8)
-  real(c_float) ::  pred_flx(batch_size,60,4)
+  real(c_float) :: input_3d(batch_size, 60, 1, 6)
+  real(c_float) :: input_2d(batch_size, 1, 8)
+  real(c_float) ::  pred_flx(batch_size, 60, 4)
 
   ! netcdf
   character(1024) :: netcdf_data_file,varname,icon_grid
-  character(50) :: dim_name(6),grid_dim_name(14)
+  character(50) :: dim_name(6), grid_dim_name(14)
   character(19) :: timestamp(4)
-  integer :: dim_len(6),grid_dim_len(14)
+  integer :: dim_len(6), grid_dim_len(14)
 
   ! indices
   integer :: i, k, id_d
