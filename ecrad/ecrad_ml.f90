@@ -21,10 +21,11 @@ program ecrad_ml
   ! SR/TODO Should just require swapping out the regular arrays for allocatables
   ! define gridsize (icon grid indices)
   !integer,parameter :: batch_size = 10
-  !integer,parameter :: batch_size = 100
+  integer,parameter :: batch_size = 100
   !integer,parameter :: batch_size = 1000
   !integer,parameter :: batch_size = 10000
-  integer,parameter :: batch_size = 81919
+  !integer,parameter :: batch_size = 81919
+  !integer,parameter :: batch_size = 81920
   integer, parameter :: nsteps = 4
   integer, parameter :: nflxs = 4
   integer, parameter :: nvars_2d_rd = 8
