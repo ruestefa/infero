@@ -151,6 +151,8 @@ program ecrad_ml
   write(*,'(a)') 'allocate fields for NetCDF data'
   ALLOCATE(from_netcdf_2d(dim_len(idim_ncells), dim_len(idim_time), nvars_2d_rd))
   ALLOCATE(from_netcdf_3d(dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time), nvars_3d_rd))
+  from_netcdf_2d(:,:,:) = 0.0_c_float
+  from_netcdf_3d(:,:,:,:) = 0.0_c_float
 
   write(*,'(a)') 'allocate fields for model data'
   ALLOCATE(input_2d(batch_size, dummy_dim, nvars_2d_in))
@@ -158,6 +160,11 @@ program ecrad_ml
   ALLOCATE(pred_flx(batch_size, dim_len(idim_height), 4))  ! should be idim_height_2
   ALLOCATE(swflx(batch_size, dim_len(idim_height), 2, nsteps))  ! should be idim_height_2
   ALLOCATE(lwflx(batch_size, dim_len(idim_height), 2, nsteps))  ! should be idim_height_2
+  input_2d(:,:,:) = 0.0_c_float
+  input_3d(:,:,:,:) = 0.0_c_float
+  pred_flx(:,:,:) = 0.0_c_float
+  swflx(:,:,:,:) = 0.0_c_float
+  lwflx(:,:,:,:) = 0.0_c_float
 
   ! 2d fields
   write(*,'(a)') 'read 2D fields'
