@@ -46,7 +46,7 @@ program ecrad_ml
   real(c_float) ::  pred_flx(batch_size, nlev, nsteps)        ! SR/TODO Why not batch_size+1?
 
   ! netcdf
-  character(1024) :: netcdf_data_file,varname,icon_grid
+  character(1024) :: netcdf_data_file, icon_grid
   character(50) :: dim_name(ndims), grid_dim_name(14)
   character(19) :: timestamp(nsteps)
   integer :: dim_len(ndims), grid_dim_len(14)
@@ -133,13 +133,9 @@ program ecrad_ml
   ALLOCATE(lat(batch_size + 1))
   ALLOCATE(lon(batch_size + 1))
 
-  varname="neighbor_cell_index"
-  call read_nc_2d(icon_grid, varname, neighbor_cell_index(:,:), grid_dim_len(1), grid_dim_len(5))
-
-  varname="clat"
-  call read_nc_1d(icon_grid, varname, clat, grid_dim_len(1))
-  varname="clon"
-  call read_nc_1d(icon_grid, varname, clon, grid_dim_len(1))
+  call read_nc_2d(icon_grid, "neighbor_cell_index", neighbor_cell_index(:,:), grid_dim_len(1), grid_dim_len(5))
+  call read_nc_1d(icon_grid, "clat", clat, grid_dim_len(1))
+  call read_nc_1d(icon_grid, "clon", clon, grid_dim_len(1))
 
   ! compute domain extent
   DO i=1,batch_size+1
@@ -179,45 +175,27 @@ program ecrad_ml
 
   ! 2d fields
   write(*,'(a)') 'read 2D fields'
-  varname="pres_sfc"
-  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,1), dim_len(idim_ncells), dim_len(idim_time))
-  varname="cosmu0"
-  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,2), dim_len(idim_ncells), dim_len(idim_time))
-  varname="qv_s"
-  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,3), dim_len(idim_ncells), dim_len(idim_time))
-  varname="albvisdir"
-  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,4), dim_len(idim_ncells), dim_len(idim_time))
-  varname="albnirdir"
-  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,5), dim_len(idim_ncells), dim_len(idim_time))
-  varname="tsfctrad"
-  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,6), dim_len(idim_ncells), dim_len(idim_time))
-  varname="albvisdif"
-  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,7), dim_len(idim_ncells), dim_len(idim_time))
-  varname="albnirdif"
-  call read_nc_2d(netcdf_data_file, varname, from_netcdf_2d(:,:,8), dim_len(idim_ncells), dim_len(idim_time))
+  call read_nc_2d(netcdf_data_file, "pres_sfc",   from_netcdf_2d(:,:,1), dim_len(idim_ncells), dim_len(idim_time))
+  call read_nc_2d(netcdf_data_file, "cosmu0",     from_netcdf_2d(:,:,2), dim_len(idim_ncells), dim_len(idim_time))
+  call read_nc_2d(netcdf_data_file, "qv_s",       from_netcdf_2d(:,:,3), dim_len(idim_ncells), dim_len(idim_time))
+  call read_nc_2d(netcdf_data_file, "albvisdir",  from_netcdf_2d(:,:,4), dim_len(idim_ncells), dim_len(idim_time))
+  call read_nc_2d(netcdf_data_file, "albnirdir",  from_netcdf_2d(:,:,5), dim_len(idim_ncells), dim_len(idim_time))
+  call read_nc_2d(netcdf_data_file, "tsfctrad",   from_netcdf_2d(:,:,6), dim_len(idim_ncells), dim_len(idim_time))
+  call read_nc_2d(netcdf_data_file, "albvisdif",  from_netcdf_2d(:,:,7), dim_len(idim_ncells), dim_len(idim_time))
+  call read_nc_2d(netcdf_data_file, "albnirdif",  from_netcdf_2d(:,:,8), dim_len(idim_ncells), dim_len(idim_time))
 
   ! 3d fields
   write(*,'(a)') 'read 3D fields'
-  varname="clc"
-  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,1), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
-  varname="temp"
-  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,2), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
-  varname="pres"
-  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,3), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
-  varname="qc"
-  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,4), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
-  varname="qi"
-  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,5), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
-  varname="qv"
-  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,6), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
-  varname="lwflx_up"
-  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,7), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
-  varname="lwflx_dn"
-  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,8), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
-  varname="swflx_up"
-  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,9), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
-  varname="swflx_dn"
-  call read_nc_3d(netcdf_data_file, varname, from_netcdf_3d(:,:,:,10), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
+  call read_nc_3d(netcdf_data_file, "clc",        from_netcdf_3d(:,:,:,1), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
+  call read_nc_3d(netcdf_data_file, "temp",       from_netcdf_3d(:,:,:,2), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
+  call read_nc_3d(netcdf_data_file, "pres",       from_netcdf_3d(:,:,:,3), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
+  call read_nc_3d(netcdf_data_file, "qc",         from_netcdf_3d(:,:,:,4), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
+  call read_nc_3d(netcdf_data_file, "qi",         from_netcdf_3d(:,:,:,5), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
+  call read_nc_3d(netcdf_data_file, "qv",         from_netcdf_3d(:,:,:,6), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
+  call read_nc_3d(netcdf_data_file, "lwflx_up",   from_netcdf_3d(:,:,:,7), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
+  call read_nc_3d(netcdf_data_file, "lwflx_dn",   from_netcdf_3d(:,:,:,8), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
+  call read_nc_3d(netcdf_data_file, "swflx_up",   from_netcdf_3d(:,:,:,9), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
+  call read_nc_3d(netcdf_data_file, "swflx_dn",   from_netcdf_3d(:,:,:,10), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
 
 
   ! TIMESTEP
@@ -252,29 +230,19 @@ program ecrad_ml
 
     ! input
     write(*,'(a)') 'compute stats of input vars'
-    varname="input_clc"
-    CALL stats_2d(varname, input_3d(:,:,1,1))
-    varname="input_temp"
-    CALL stats_2d(varname, input_3d(:,:,1,2))
-    varname="input_pres"
-    CALL stats_2d(varname, input_3d(:,:,1,3))
-    varname="input_qc"
-    CALL stats_2d(varname, input_3d(:,:,1,4))
-    varname="input_qi"
-    CALL stats_2d(varname, input_3d(:,:,1,5))
-    varname="input_qv"
-    CALL stats_2d(varname, input_3d(:,:,1,6))
+    CALL stats_2d("input_clc",  input_3d(:,:,1,1))
+    CALL stats_2d("input_temp", input_3d(:,:,1,2))
+    CALL stats_2d("input_pres", input_3d(:,:,1,3))
+    CALL stats_2d("input_qc",   input_3d(:,:,1,4))
+    CALL stats_2d("input_qi",   input_3d(:,:,1,5))
+    CALL stats_2d("input_qv",   input_3d(:,:,1,6))
 
     ! output
     write(*,'(a)') 'compute stats of output vars'
-    varname="lwflx_up"
-    CALL stats_2d(varname, pred_flx(:,:,1))
-    varname="lwflx_dn"
-    CALL stats_2d(varname, pred_flx(:,:,2))
-    varname="swflx_up"
-    CALL stats_2d(varname, pred_flx(:,:,3))
-    varname="swflx_dn"
-    CALL stats_2d(varname, pred_flx(:,:,4))
+    CALL stats_2d("lwflx_up", pred_flx(:,:,1))
+    CALL stats_2d("lwflx_dn", pred_flx(:,:,2))
+    CALL stats_2d("swflx_up", pred_flx(:,:,3))
+    CALL stats_2d("swflx_dn", pred_flx(:,:,4))
   ENDDO
 
 
@@ -419,7 +387,7 @@ SUBROUTINE get_nc_dims(infile,dim_name,dim_len,nr_dims)
   INTEGER(KIND=4), INTENT(OUT) :: dim_len(nr_dims)
   CHARACTER(LEN=50), INTENT(OUT) :: dim_name(nr_dims)
   INTEGER(KIND=4) :: ncid,i
-  CHARACTER(LEN=1024), INTENT(IN) :: infile
+  CHARACTER(LEN=*), INTENT(IN) :: infile
   !Open netCDF file
   !:-------:-------:-------:-------:-------:-------:-------:
   CALL check(nf90_open(TRIM(infile), nf90_nowrite, ncid))
@@ -444,7 +412,7 @@ SUBROUTINE read_nc_3d(infile,varname,idata,nx,ny,nz)
   INTEGER(KIND=4), INTENT(IN) :: nx,ny,nz
   INTEGER(KIND=4), DIMENSION(3) :: dimids
   INTEGER(KIND=4) :: ncid, ndims, varid
-  CHARACTER(LEN=1024), INTENT(IN) :: infile,varname
+  CHARACTER(LEN=*), INTENT(IN) :: infile, varname
   write(*,'(a)') 'read_nc_3d'
   !Open netCDF file
   !:-------:-------:-------:-------:-------:-------:-------:-------:
@@ -480,7 +448,7 @@ SUBROUTINE read_nc_1d(infile,varname,idata,nx)
   INTEGER(KIND=4), INTENT(IN) :: nx
   INTEGER(KIND=4), DIMENSION(1) :: dimids
   INTEGER(KIND=4) :: ncid, ndims, varid
-  CHARACTER(LEN=1024), INTENT(IN) :: infile,varname
+  CHARACTER(LEN=*), INTENT(IN) :: infile, varname
   write(*,'(a)') 'read_nc_1d'
   !Open netCDF file
   !:-------:-------:-------:-------:-------:-------:-------:-------:
@@ -509,7 +477,7 @@ SUBROUTINE read_nc_2d(infile,varname,idata,nx,ny)
   INTEGER(KIND=4), INTENT(IN) :: nx,ny
   INTEGER(KIND=4), DIMENSION(2) :: dimids
   INTEGER(KIND=4) :: ncid, ndims, varid
-  CHARACTER(LEN=1024), INTENT(IN) :: infile,varname
+  CHARACTER(LEN=*), INTENT(IN) :: infile, varname
   write(*,'(a)') 'read_nc_2d'
   !Open netCDF file
   !:-------:-------:-------:-------:-------:-------:-------:-------:
