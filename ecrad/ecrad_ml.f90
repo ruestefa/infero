@@ -30,6 +30,7 @@ program ecrad_ml
   integer, parameter :: nflxs = 4
   integer, parameter :: nvars_2d = 10
   integer, parameter :: nvars_3d = 8
+  integer, parameter :: dummy_dim = 1
 
   ! input dimensions
   integer, parameter :: ndims = 6
@@ -41,9 +42,9 @@ program ecrad_ml
   integer, parameter :: idim_height_2 = 6
 
   ! input and output tensors
-  real(c_float) :: input_3d(batch_size, nlev, 1, nvars_3d-2)  ! SR/TODO Why not batch_size+1? Why nvars_3d-2?
-  real(c_float) :: input_2d(batch_size, 1, nvars_2d-2)        ! SR/TODO Why not batch_size+1? Why nvars_2d-2?
-  real(c_float) ::  pred_flx(batch_size, nlev, nsteps)        ! SR/TODO Why not batch_size+1?
+  real(c_float) :: input_3d(batch_size, nlev, dummy_dim, nvars_3d-2)  ! SR/TODO Why not batch_size+1? Why nvars_3d-2?
+  real(c_float) :: input_2d(batch_size, dummy_dim, nvars_2d-2)        ! SR/TODO Why not batch_size+1? Why nvars_2d-2?
+  real(c_float) :: pred_flx(batch_size, nlev, nsteps)                 ! SR/TODO Why not batch_size+1?
 
   ! netcdf
   character(1024) :: netcdf_data_file, icon_grid
@@ -58,8 +59,8 @@ program ecrad_ml
   integer :: counter(nsteps)
 
   ! data fields
-  real(c_float), allocatable :: from_netcdf_3d(:,:,:,:)
   real(c_float), allocatable :: from_netcdf_2d(:,:,:)
+  real(c_float), allocatable :: from_netcdf_3d(:,:,:,:)
   real(c_float), allocatable :: neighbor_cell_index(:,:)
   real(c_float), allocatable :: abs_diff(:,:,:,:)
   real(c_float), allocatable :: swflx(:,:,:,:)
@@ -172,6 +173,7 @@ program ecrad_ml
   write(*,'(a)') 'allocate fields for NetCDF data'
   ALLOCATE(from_netcdf_3d(dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time), nvars_2d))
   ALLOCATE(from_netcdf_2d(dim_len(idim_ncells), dim_len(idim_time), nvars_3d))
+  write(*,'(a)') 'done allocating fields for NetCDF data'
 
   ! 2d fields
   write(*,'(a)') 'read 2D fields'
@@ -183,40 +185,39 @@ program ecrad_ml
   call read_nc_2d(netcdf_data_file, "tsfctrad",   from_netcdf_2d(:,:,6), dim_len(idim_ncells), dim_len(idim_time))
   call read_nc_2d(netcdf_data_file, "albvisdif",  from_netcdf_2d(:,:,7), dim_len(idim_ncells), dim_len(idim_time))
   call read_nc_2d(netcdf_data_file, "albnirdif",  from_netcdf_2d(:,:,8), dim_len(idim_ncells), dim_len(idim_time))
+  write(*,'(a)') 'done reading 2D fields'
 
   ! 3d fields
   write(*,'(a)') 'read 3D fields'
-  call read_nc_3d(netcdf_data_file, "clc",        from_netcdf_3d(:,:,:,1), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
-  call read_nc_3d(netcdf_data_file, "temp",       from_netcdf_3d(:,:,:,2), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
-  call read_nc_3d(netcdf_data_file, "pres",       from_netcdf_3d(:,:,:,3), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
-  call read_nc_3d(netcdf_data_file, "qc",         from_netcdf_3d(:,:,:,4), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
-  call read_nc_3d(netcdf_data_file, "qi",         from_netcdf_3d(:,:,:,5), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
-  call read_nc_3d(netcdf_data_file, "qv",         from_netcdf_3d(:,:,:,6), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
-  call read_nc_3d(netcdf_data_file, "lwflx_up",   from_netcdf_3d(:,:,:,7), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
-  call read_nc_3d(netcdf_data_file, "lwflx_dn",   from_netcdf_3d(:,:,:,8), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
-  call read_nc_3d(netcdf_data_file, "swflx_up",   from_netcdf_3d(:,:,:,9), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
+  call read_nc_3d(netcdf_data_file, "clc",        from_netcdf_3d(:,:,:, 1), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
+  call read_nc_3d(netcdf_data_file, "temp",       from_netcdf_3d(:,:,:, 2), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
+  call read_nc_3d(netcdf_data_file, "pres",       from_netcdf_3d(:,:,:, 3), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
+  call read_nc_3d(netcdf_data_file, "qc",         from_netcdf_3d(:,:,:, 4), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
+  call read_nc_3d(netcdf_data_file, "qi",         from_netcdf_3d(:,:,:, 5), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
+  call read_nc_3d(netcdf_data_file, "qv",         from_netcdf_3d(:,:,:, 6), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
+  call read_nc_3d(netcdf_data_file, "lwflx_up",   from_netcdf_3d(:,:,:, 7), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
+  call read_nc_3d(netcdf_data_file, "lwflx_dn",   from_netcdf_3d(:,:,:, 8), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
+  call read_nc_3d(netcdf_data_file, "swflx_up",   from_netcdf_3d(:,:,:, 9), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
   call read_nc_3d(netcdf_data_file, "swflx_dn",   from_netcdf_3d(:,:,:,10), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
+  write(*,'(a)') 'done reading 3D fields'
 
   ! TIMESTEP
   s_idx = 1
   e_idx = 1 + batch_size
 
+  write(*,'(a)') 'run model'
   DO step=1,nsteps
     write(*,'(a,i1)') 'STEP ', step
 
     ! update 2D input-tensor
-
-    ! center cell
     input_2d(:,1,:) = from_netcdf_2d(s_idx:e_idx, nc_time_idx(step), :)
 
     ! update 3D input-tensor
-
-    ! center cell
     input_3d(:,:,1,:) = from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), :)
 
     ! apply model
     write(*,'(a)') 'apply model'
-    call infero_check(model%infer(iset, oset ))
+    call infero_check(model%infer(iset, oset))
 
     !CALL infero_check(iset%print())
     !CALL infero_check(oset%print())
@@ -243,12 +244,10 @@ program ecrad_ml
     CALL stats_2d("swflx_dn", pred_flx(:,:,4))
   ENDDO
 
-
   ! DOMAIN EXTENT
   write(*,'(A,I7,A)') 'Domain extent for batch_size', batch_size,':'
   write(*,'(A,F8.2,A,F8.2)') '  latmax:', lat_max, ' latmin', lat_min
   write(*,'(A,F8.2,A,F8.2)') '  lonmax:', lon_max, ' lonmin', lon_min
-
 
   ! STATISTICS
   write(*,'(A)') ''
@@ -384,33 +383,6 @@ SUBROUTINE get_nc_dims(infile,dim_name,dim_len,nr_dims)
   CALL check(nf90_close(ncid))
 END SUBROUTINE get_nc_dims
 
-SUBROUTINE read_nc_3d(infile,varname,idata,nx,ny,nz)
-  use iso_c_binding, only : c_float
-  use netcdf
-  REAL(c_float), DIMENSION(nx,ny,nz), INTENT(OUT) :: idata
-  INTEGER(KIND=4), INTENT(IN) :: nx,ny,nz
-  INTEGER(KIND=4), DIMENSION(3) :: dimids
-  INTEGER(KIND=4) :: ncid, ndims, varid
-  CHARACTER(LEN=*), INTENT(IN) :: infile, varname
-  write(*,'(a)') ''
-  write(*,'(a)') 'read_nc_3d'
-  write(*,'(A)')     ' infile  : ' // TRIM(infile)
-  write(*,'(A)')     ' varname : ' // TRIM(varname)
-  write(*,'(A,I6)')  ' nx      : ', nx
-  write(*,'(A,I6)')  ' ny      : ', ny
-  write(*,'(A,I6)')  ' nz      : ', nz
-  CALL check(nf90_open(TRIM(infile), nf90_nowrite, ncid))
-  ! Get the values of the coordinates
-  !CALL check(nf90_inquire_variable(ncid,1,vname,xtype,ndims,dimids))
-  CALL check(nf90_inq_varid(ncid,TRIM(varname),varid))
-  CALL check(nf90_inquire_variable(ncid=ncid,varid=varid,ndims=ndims))
-  CALL check(nf90_inquire_variable(ncid=ncid,varid=varid,ndims=ndims,dimids=dimids))
-  write(*,'(A,I6)')  ' ndims   : ', ndims
-  write(*,'(A,3I6)') ' dimids  : ', dimids
-  CALL check(nf90_get_var(ncid,varid,idata))
-  CALL check(nf90_close(ncid))
-END SUBROUTINE read_nc_3d
-
 SUBROUTINE read_nc_1d(infile,varname,idata,nx)
   use iso_c_binding, only : c_float
   use netcdf
@@ -459,7 +431,34 @@ SUBROUTINE read_nc_2d(infile,varname,idata,nx,ny)
   CALL check(nf90_close(ncid))
 END SUBROUTINE read_nc_2d
 
-SUBROUTINE mean_2d(input, mean,nx,ny)
+SUBROUTINE read_nc_3d(infile,varname,idata,nx,ny,nz)
+  use iso_c_binding, only : c_float
+  use netcdf
+  REAL(c_float), DIMENSION(nx,ny,nz), INTENT(OUT) :: idata
+  INTEGER(KIND=4), INTENT(IN) :: nx,ny,nz
+  INTEGER(KIND=4), DIMENSION(3) :: dimids
+  INTEGER(KIND=4) :: ncid, ndims, varid
+  CHARACTER(LEN=*), INTENT(IN) :: infile, varname
+  write(*,'(a)') ''
+  write(*,'(a)') 'read_nc_3d'
+  write(*,'(A)')     ' infile  : ' // TRIM(infile)
+  write(*,'(A)')     ' varname : ' // TRIM(varname)
+  write(*,'(A,I6)')  ' nx      : ', nx
+  write(*,'(A,I6)')  ' ny      : ', ny
+  write(*,'(A,I6)')  ' nz      : ', nz
+  CALL check(nf90_open(TRIM(infile), nf90_nowrite, ncid))
+  ! Get the values of the coordinates
+  !CALL check(nf90_inquire_variable(ncid,1,vname,xtype,ndims,dimids))
+  CALL check(nf90_inq_varid(ncid,TRIM(varname),varid))
+  CALL check(nf90_inquire_variable(ncid=ncid,varid=varid,ndims=ndims))
+  CALL check(nf90_inquire_variable(ncid=ncid,varid=varid,ndims=ndims,dimids=dimids))
+  write(*,'(A,I6)')  ' ndims   : ', ndims
+  write(*,'(A,3I6)') ' dimids  : ', dimids
+  CALL check(nf90_get_var(ncid,varid,idata))
+  CALL check(nf90_close(ncid))
+END SUBROUTINE read_nc_3d
+
+SUBROUTINE mean_2d(input,mean,nx,ny)
   use iso_c_binding, only : c_float
   INTEGER, INTENT(IN) :: nx,ny
   REAL(c_float), INTENT(IN) :: input(nx,ny)
