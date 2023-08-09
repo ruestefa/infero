@@ -359,15 +359,17 @@ CONTAINS
     use iso_c_binding, only : c_float
     REAL(c_float), INTENT(IN) :: input(:,:)
     CHARACTER(*) :: varname
-    INTEGER :: i,j
+    INTEGER :: nx,ny,i,j
     REAL(c_float):: mean
+    nx = SIZE(input,DIM=1)
+    ny = SIZE(input,DIM=2)
     mean = 0.0
-    DO i=1,SIZE(input,DIM=1)
-      DO j=1,SIZE(input,DIM=2)
+    DO i=1,nx
+      DO j=1,ny
         mean = mean + input(i,j)
       ENDDO
     ENDDO
-    mean = mean / REAL(i*j)
+    mean = mean / REAL(nx*ny)
     !JJ: uncomment for shape information
     !write(message_text,*) SHAPE(input)
     !write(message_text,'(A)') TRIM(message_text)
