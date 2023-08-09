@@ -197,7 +197,6 @@ program ecrad_ml
   call read_nc_3d(netcdf_data_file, "swflx_up",   from_netcdf_3d(:,:,:,9), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
   call read_nc_3d(netcdf_data_file, "swflx_dn",   from_netcdf_3d(:,:,:,10), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
 
-
   ! TIMESTEP
   s_idx = 1
   e_idx = 1 + batch_size
@@ -214,7 +213,6 @@ program ecrad_ml
 
     ! center cell
     input_3d(:,:,1,:) = from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), :)
-
 
     ! apply model
     write(*,'(a)') 'apply model'
@@ -283,14 +281,10 @@ program ecrad_ml
   write(*,'(A)') ''
   write(*,'(A)') '  Mean Absolute Error (MAE):'
   DO step=1,nsteps
-    ! lwflux_up
-    abs_diff(:,:,1,step) = ABS(lwflx(:,:,1,step) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 7))
-    ! lwflux_dn
-    abs_diff(:,:,2,step) = ABS(lwflx(:,:,2,step) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 8))
-    ! swflux_up
-    abs_diff(:,:,3,step) = ABS(swflx(:,:,1,step) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 9))
-    ! swflux_dn
-    abs_diff(:,:,4,step) = ABS(swflx(:,:,2,step) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 10))
+    abs_diff(:,:,1,step) = ABS(lwflx(:,:,1,step) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 7))  ! lwflux_up
+    abs_diff(:,:,2,step) = ABS(lwflx(:,:,2,step) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 8))  ! lwflux_dn
+    abs_diff(:,:,3,step) = ABS(swflx(:,:,1,step) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 9))  ! swflux_up
+    abs_diff(:,:,4,step) = ABS(swflx(:,:,2,step) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 10)) ! swflux_dn
 
     ! mean values
     CALL mean_2d(abs_diff(:,:,1,step), mean_absolute_error(1,step), batch_size, nlev)
@@ -330,7 +324,6 @@ program ecrad_ml
     write(*,'(A,F8.2,A,F8.2)') '     LW (toa): MAX ',MAXVAL(lwflx(:,60,2,step)),' MIN ', MINVAL(lwflx(:,60,2,step))
   ENDDO
 
-
   ! CLEANUP
 
   ! free the model
@@ -357,146 +350,113 @@ CONTAINS
     use iso_c_binding, only : c_float
     REAL(c_float), INTENT(IN) :: input(:,:)
     CHARACTER(*) :: varname
-
     INTEGER :: i,j
     REAL(c_float):: mean
-
     mean = 0.0
     DO i=1,SIZE(input,DIM=1)
       DO j=1,SIZE(input,DIM=2)
         mean = mean + input(i,j)
       ENDDO
     ENDDO
-
     mean = mean / REAL(i*j)
-
     !JJ: uncomment for shape information
     !write(message_text,*) SHAPE(input)
     !write(message_text,'(A)') TRIM(message_text)
     !CALL message(TRIM(varname),message_text)
-
-    write(*,'(A,A,F8.2,A,F8.2,A,F8.2)') TRIM(varname),': MEAN ',mean,' MAX ',MAXVAL(input(:,:)),' MIN ', MINVAL(input(:,:))
-
+    write(*,'(A,A,F8.2,A,F8.2,A,F8.2)') &
+      TRIM(varname),': MEAN ',mean,' MAX ',MAXVAL(input(:,:)),' MIN ', MINVAL(input(:,:))
   END SUBROUTINE stats_2d
 
 end program
 
 SUBROUTINE get_nc_dims(infile,dim_name,dim_len,nr_dims)
   use netcdf
-
   INTEGER(KIND=4), INTENT(OUT) :: dim_len(nr_dims)
   CHARACTER(LEN=50), INTENT(OUT) :: dim_name(nr_dims)
   INTEGER(KIND=4) :: ncid,i
   CHARACTER(LEN=*), INTENT(IN) :: infile
-  !Open netCDF file
-  !:-------:-------:-------:-------:-------:-------:-------:
   CALL check(nf90_open(TRIM(infile), nf90_nowrite, ncid))
-  !Inquire about the dimensions
-  !:-------:-------:-------:-------:-------:-------:-------:
-
   write(*,'(A,A)') 'Dimension of NetCDF: ',TRIM(infile)
   DO i=1,nr_dims
     CALL check(nf90_inquire_dimension(ncid,i,dim_name(i),dim_len(i)))
     write(*,'(A,A,A,I7)') '  ',TRIM(dim_name(i)), ':', dim_len(i)
   ENDDO
-  !Close netCDF file
-  !:-------:-------:-------:-------:-------:-------:-------:
   CALL check(nf90_close(ncid))
 END SUBROUTINE get_nc_dims
 
 SUBROUTINE read_nc_3d(infile,varname,idata,nx,ny,nz)
   use iso_c_binding, only : c_float
   use netcdf
-
   REAL(c_float), DIMENSION(nx,ny,nz), INTENT(OUT) :: idata
   INTEGER(KIND=4), INTENT(IN) :: nx,ny,nz
   INTEGER(KIND=4), DIMENSION(3) :: dimids
   INTEGER(KIND=4) :: ncid, ndims, varid
   CHARACTER(LEN=*), INTENT(IN) :: infile, varname
+  write(*,'(a)') ''
   write(*,'(a)') 'read_nc_3d'
-  !Open netCDF file
-  !:-------:-------:-------:-------:-------:-------:-------:-------:
-  CALL check(nf90_open(TRIM(infile), nf90_nowrite, ncid))
-
-  !Get the values of the coordinates and put them in xpos & ypos
-  !:-------:-------:-------:-------:-------:-------:-------:-------:
-  !CALL check(nf90_inquire_variable(ncid,1,vname,xtype,ndims,dimids))
-  CALL check(nf90_inq_varid(ncid,TRIM(varname),varid))
-  CALL check(nf90_inquire_variable(ncid=ncid,varid=varid,ndims=ndims))
-  CALL check(nf90_inquire_variable(ncid=ncid,varid=varid,ndims=ndims,dimids=dimids))
-
   write(*,'(A)')     ' infile  : ' // TRIM(infile)
   write(*,'(A)')     ' varname : ' // TRIM(varname)
   write(*,'(A,I6)')  ' nx      : ', nx
   write(*,'(A,I6)')  ' ny      : ', ny
   write(*,'(A,I6)')  ' nz      : ', nz
+  CALL check(nf90_open(TRIM(infile), nf90_nowrite, ncid))
+  ! Get the values of the coordinates
+  !CALL check(nf90_inquire_variable(ncid,1,vname,xtype,ndims,dimids))
+  CALL check(nf90_inq_varid(ncid,TRIM(varname),varid))
+  CALL check(nf90_inquire_variable(ncid=ncid,varid=varid,ndims=ndims))
+  CALL check(nf90_inquire_variable(ncid=ncid,varid=varid,ndims=ndims,dimids=dimids))
   write(*,'(A,I6)')  ' ndims   : ', ndims
   write(*,'(A,3I6)') ' dimids  : ', dimids
-
   CALL check(nf90_get_var(ncid,varid,idata))
-  !Close netCDF file
-  !:-------:-------:-------:-------:-------:-------:-------:-------:
   CALL check(nf90_close(ncid))
-
 END SUBROUTINE read_nc_3d
 
 SUBROUTINE read_nc_1d(infile,varname,idata,nx)
   use iso_c_binding, only : c_float
   use netcdf
-
   REAL(c_float), DIMENSION(nx), INTENT(OUT) :: idata
   INTEGER(KIND=4), INTENT(IN) :: nx
   INTEGER(KIND=4), DIMENSION(1) :: dimids
   INTEGER(KIND=4) :: ncid, ndims, varid
   CHARACTER(LEN=*), INTENT(IN) :: infile, varname
+  write(*,'(a)') ''
   write(*,'(a)') 'read_nc_1d'
-  !Open netCDF file
-  !:-------:-------:-------:-------:-------:-------:-------:-------:
-  CALL check(nf90_open(TRIM(infile), nf90_nowrite, ncid))
-  CALL check(nf90_inq_varid(ncid,TRIM(varname),varid))
-  CALL check(nf90_inquire_variable(ncid=ncid,varid=varid,ndims=ndims,dimids=dimids))
-
   write(*,'(A)')     ' infile  : ' // TRIM(infile)
   write(*,'(A)')     ' varname : ' // TRIM(varname)
   write(*,'(A,I6)')  ' nx      : ', nx
+  ! Get the values of the coordinates
+  CALL check(nf90_open(TRIM(infile), nf90_nowrite, ncid))
+  CALL check(nf90_inq_varid(ncid,TRIM(varname),varid))
+  CALL check(nf90_inquire_variable(ncid=ncid,varid=varid,ndims=ndims,dimids=dimids))
   write(*,'(A,I6)')  ' ndims   : ', ndims
   write(*,'(A,1I6)') ' dimids  : ', dimids
-
+  ! Get the variable
   CALL check(nf90_get_var(ncid,varid,idata))
-  !Close netCDF file
-  !:-------:-------:-------:-------:-------:-------:-------:-------:
   CALL check(nf90_close(ncid))
-
 END SUBROUTINE read_nc_1d
 
 SUBROUTINE read_nc_2d(infile,varname,idata,nx,ny)
   use iso_c_binding, only : c_float
   use netcdf
-
   REAL(c_float), DIMENSION(nx,ny), INTENT(OUT) :: idata
   INTEGER(KIND=4), INTENT(IN) :: nx,ny
   INTEGER(KIND=4), DIMENSION(2) :: dimids
   INTEGER(KIND=4) :: ncid, ndims, varid
   CHARACTER(LEN=*), INTENT(IN) :: infile, varname
+  write(*,'(a)') ''
   write(*,'(a)') 'read_nc_2d'
-  !Open netCDF file
-  !:-------:-------:-------:-------:-------:-------:-------:-------:
-  CALL check(nf90_open(TRIM(infile), nf90_nowrite, ncid))
-  CALL check(nf90_inq_varid(ncid,TRIM(varname),varid))
-  CALL check(nf90_inquire_variable(ncid=ncid,varid=varid,ndims=ndims,dimids=dimids))
-
   write(*,'(A)')     ' infile  : ' // TRIM(infile)
   write(*,'(A)')     ' varname : ' // TRIM(varname)
   write(*,'(A,I6)')  ' nx      : ', nx
   write(*,'(A,I6)')  ' ny      : ', ny
+  CALL check(nf90_open(TRIM(infile), nf90_nowrite, ncid))
+  CALL check(nf90_inq_varid(ncid,TRIM(varname),varid))
+  CALL check(nf90_inquire_variable(ncid=ncid,varid=varid,ndims=ndims,dimids=dimids))
   write(*,'(A,I6)')  ' ndims   : ', ndims
   write(*,'(A,2I6)') ' dimids  : ', dimids
-
+  ! Get the variable
   CALL check(nf90_get_var(ncid,varid,idata))
-  !Close netCDF file
-  !:-------:-------:-------:-------:-------:-------:-------:-------:
   CALL check(nf90_close(ncid))
-
 END SUBROUTINE read_nc_2d
 
 SUBROUTINE mean_2d(input, mean,nx,ny)
@@ -504,20 +464,15 @@ SUBROUTINE mean_2d(input, mean,nx,ny)
   INTEGER, INTENT(IN) :: nx,ny
   REAL(c_float), INTENT(IN) :: input(nx,ny)
   REAL(c_float), INTENT(OUT):: mean
-
   INTEGER :: i,j
-
   mean = 0.0
   DO i=1,nx
     DO j=1,ny
       mean = mean + input(i,j)
     ENDDO
   ENDDO
-
   mean = mean / REAL(nx*ny)
-
 END SUBROUTINE mean_2d
-
 
 SUBROUTINE check(istatus)
   use netcdf
@@ -526,4 +481,3 @@ SUBROUTINE check(istatus)
     write(*,'(A)') 'ERROR: '//TRIM((nf90_strerror(istatus)))
   END IF
 END SUBROUTINE check
-
