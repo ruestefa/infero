@@ -28,8 +28,10 @@ program ecrad_ml
   integer, parameter :: nlev = 70
   integer, parameter :: nsteps = 4
   integer, parameter :: nflxs = 4
-  integer, parameter :: nvars_2d = 10
-  integer, parameter :: nvars_3d = 8
+  integer, parameter :: nvars_2d_rd = 8
+  integer, parameter :: nvars_2d_in = 8
+  integer, parameter :: nvars_3d_rd = 10
+  integer, parameter :: nvars_3d_in = 6
   integer, parameter :: dummy_dim = 1
 
   ! input dimensions
@@ -42,9 +44,9 @@ program ecrad_ml
   integer, parameter :: idim_height_2 = 6
 
   ! input and output tensors
-  real(c_float) :: input_3d(batch_size, nlev, dummy_dim, nvars_3d-2)  ! SR/TODO Why not batch_size+1? Why nvars_3d-2?
-  real(c_float) :: input_2d(batch_size, dummy_dim, nvars_2d-2)        ! SR/TODO Why not batch_size+1? Why nvars_2d-2?
-  real(c_float) :: pred_flx(batch_size, nlev, nsteps)                 ! SR/TODO Why not batch_size+1?
+  real(c_float) :: input_3d(batch_size, nlev, dummy_dim, nvars_3d_in)
+  real(c_float) :: input_2d(batch_size, dummy_dim, nvars_2d_in)
+  real(c_float) :: pred_flx(batch_size, nlev, nsteps)
 
   ! netcdf
   character(1024) :: netcdf_data_file, icon_grid
@@ -171,8 +173,8 @@ program ecrad_ml
 
   ! fields for NetCDF data
   write(*,'(a)') 'allocate fields for NetCDF data'
-  ALLOCATE(from_netcdf_3d(dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time), nvars_2d))
-  ALLOCATE(from_netcdf_2d(dim_len(idim_ncells), dim_len(idim_time), nvars_3d))
+  ALLOCATE(from_netcdf_2d(dim_len(idim_ncells), dim_len(idim_time), nvars_2d_rd))
+  ALLOCATE(from_netcdf_3d(dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time), nvars_3d_rd))
   write(*,'(a)') 'done allocating fields for NetCDF data'
 
   ! 2d fields
@@ -210,10 +212,10 @@ program ecrad_ml
     write(*,'(a,i1)') 'STEP ', step
 
     ! update 2D input-tensor
-    input_2d(:,1,:) = from_netcdf_2d(s_idx:e_idx, nc_time_idx(step), :)
+    input_2d(:,dummy_dim,1:nvars_2d_in) = from_netcdf_2d(s_idx:e_idx, nc_time_idx(step), 1:nvars_2d_in)
 
     ! update 3D input-tensor
-    input_3d(:,:,1,:) = from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), :)
+    input_3d(:,:,dummy_dim,1:nvars_3d_in) = from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 1:nvars_3d_in)
 
     ! apply model
     write(*,'(a)') 'apply model'
