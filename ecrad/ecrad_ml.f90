@@ -171,6 +171,12 @@ program ecrad_ml
   write(*,'(a,i6)') 'dim_len(idim_height_2) = ', dim_len(idim_height_2)
   write(*,'(A)') ''
 
+  ! SR/TODO properly deal w/ height_2 fields (now using idim_height everywhere)
+  if (dim_len(idim_height) /= dim_len(idim_height_2)) then
+    write(*,'(a,2i6)') 'ERROR: height != height_2: ', dim_len(idim_height), dim_len(idim_height_2)
+    ! TODO ABORT
+  endif
+
   ! fields for NetCDF data
   write(*,'(a)') 'allocate fields for NetCDF data'
   ALLOCATE(from_netcdf_2d(dim_len(idim_ncells), dim_len(idim_time), nvars_2d_rd))
