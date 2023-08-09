@@ -207,21 +207,42 @@ program ecrad_ml
   call read_nc_3d(netcdf_data_file, "lwflx_dn",   from_netcdf_3d(:,:,:, 8), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
   call read_nc_3d(netcdf_data_file, "swflx_up",   from_netcdf_3d(:,:,:, 9), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
   call read_nc_3d(netcdf_data_file, "swflx_dn",   from_netcdf_3d(:,:,:,10), dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time))
-  write(*,'(a)') 'done reading 3D fields'
+
+  ! SET UP INFERO AND ASSIGN IN/OUT TENSORS
+
+  ! init infero
+  write(*,'(a)') 'initialize infero'
+  call infero_check(infero_initialise())
+
+  ! YAML config string -> LW/SW
+  yaml_config = "---"//NEW_LINE('A') &
+    & //"  path: "//TRIM(model_path)//NEW_LINE('A') &
+    & //"  type: "//TRIM(model_type)//c_null_char
+
+  ! get a infero model for LW/SW
+  call infero_check(model%initialise_from_yaml_string(yaml_config))
+
+  ! init tensor sets
+  call infero_check(iset%initialise())
+  call infero_check(oset%initialise())
+  call infero_check(iset%push_tensor(input_3d, "serving_default_input_2d"))
+  call infero_check(iset%push_tensor(input_2d, "serving_default_input_3d"))
+  call infero_check(oset%push_tensor(pred_flx, "StatefulPartitionedCall"))
 
   ! TIMESTEP
   s_idx = 1
-  e_idx = 1 + batch_size
+  e_idx = batch_size
+  ! SR/TODO remove these helper variables?
 
   write(*,'(a)') 'run model'
   DO step=1,nsteps
     write(*,'(a,i1)') 'STEP ', step
 
-    ! update 2D input-tensor
-    input_2d(:,dummy_dim,1:nvars_2d_in) = from_netcdf_2d(s_idx:e_idx, nc_time_idx(step), 1:nvars_2d_in)
-
-    ! update 3D input-tensor
-    input_3d(:,:,dummy_dim,1:nvars_3d_in) = from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 1:nvars_3d_in)
+    ! update input-tensors
+    input_2d(s_idx:e_idx, dummy_dim, 1:nvars_2d_in) = &
+      & from_netcdf_2d(s_idx:e_idx, nc_time_idx(step), 1:nvars_2d_in)
+    input_3d(s_idx:e_idx, 1:dim_len(idim_height), dummy_dim, 1:nvars_3d_in) = &
+      & from_netcdf_3d(s_idx:e_idx, 1:dim_len(idim_height), nc_time_idx(step), 1:nvars_3d_in)
 
     ! apply model
     write(*,'(a)') 'apply model'
@@ -232,8 +253,10 @@ program ecrad_ml
 
     ! store results in permanent fields
     write(*,'(a)') 'store results in permanent fields'
-    lwflx(:,:,:,step) = pred_flx(:,:,1:2)
-    swflx(:,:,:,step) = pred_flx(:,:,3:4)
+    lwflx(s_idx:e_idx, 1:dim_len(idim_height), 1:2, step) = &
+      & pred_flx(s_idx:e_idx, 1:dim_len(idim_height), 1:2)
+    swflx(s_idx:e_idx, 1:dim_len(idim_height), 1:2, step) = &
+      & pred_flx(s_idx:e_idx, 1:dim_len(idim_height), 3:4)
 
     ! input
     write(*,'(a)') 'compute stats of input vars'
@@ -371,7 +394,7 @@ CONTAINS
     !write(message_text,'(A)') TRIM(message_text)
     !CALL message(TRIM(varname),message_text)
     write(*,'(A,A,F8.2,A,F8.2,A,F8.2)') &
-      TRIM(varname),': MEAN ',mean,' MAX ',MAXVAL(input(:,:)),' MIN ', MINVAL(input(:,:))
+      & TRIM(varname),': MEAN ',mean,' MAX ',MAXVAL(input(:,:)),' MIN ', MINVAL(input(:,:))
   END SUBROUTINE stats_2d
 
 end program
