@@ -25,7 +25,6 @@ program ecrad_ml
   !integer,parameter :: batch_size = 1000
   !integer,parameter :: batch_size = 10000
   integer,parameter :: batch_size = 81919
-  integer, parameter :: nlev = 70
   integer, parameter :: nsteps = 4
   integer, parameter :: nflxs = 4
   integer, parameter :: nvars_2d_rd = 8
@@ -44,9 +43,9 @@ program ecrad_ml
   integer, parameter :: idim_height_2 = 6
 
   ! input and output tensors
-  real(c_float) :: input_3d(batch_size, nlev, dummy_dim, nvars_3d_in)
-  real(c_float) :: input_2d(batch_size, dummy_dim, nvars_2d_in)
-  real(c_float) :: pred_flx(batch_size, nlev, nsteps)
+  real(c_float), allocatable :: input_3d(:,:,:,:)
+  real(c_float), allocatable :: input_2d(:,:,:)
+  real(c_float), allocatable :: pred_flx(:,:,:)
 
   ! netcdf
   character(1024) :: netcdf_data_file, icon_grid
@@ -57,6 +56,7 @@ program ecrad_ml
   ! indices
   integer :: i, k, id_d
   integer :: step, s_idx, e_idx
+  integer :: nlev
   integer :: nc_time_idx(nsteps)
   integer :: counter(nsteps)
 
@@ -78,31 +78,6 @@ program ecrad_ml
   CALL get_command_argument(1, model_path)
   CALL get_command_argument(2, model_type)
 
-  ! SET UP INFERO AND ASSIGN IN/OUT TENSORS
-
-  ! init infero
-  write(*,'(a)') 'initialize infero'
-  call infero_check(infero_initialise())
-
-  ! YAML config string -> LW/SW
-  yaml_config = "---"//NEW_LINE('A') &
-    //"  path: "//TRIM(model_path)//NEW_LINE('A') &
-    //"  type: "//TRIM(model_type)//c_null_char
-
-  ! get a infero model for LW/SW
-  call infero_check(model%initialise_from_yaml_string(yaml_config))
-
-
-  ! init tensor sets
-  call infero_check(iset%initialise())
-  call infero_check(oset%initialise())
-
-  ! input is identical for both models
-  call infero_check(iset%push_tensor(input_3d, "serving_default_input_22"))
-  call infero_check(iset%push_tensor(input_2d, "serving_default_input_23"))
-
-  call infero_check(oset%push_tensor(pred_flx, "StatefulPartitionedCall"))
-
   ! DEFINE PERIOD (FULL SOLAR CYCLE)
   ! correspond to file nr. 5
   timestamp(1) = "2000-01-29 00:00:00"
@@ -115,11 +90,6 @@ program ecrad_ml
   nc_time_idx(2) = 2
   nc_time_idx(3) = 3
   nc_time_idx(4) = 4
-
-  ! fields to store model output
-  write(*,'(a)') 'allocate fields to store model output'
-  ALLOCATE(swflx(batch_size, nlev, 2, nsteps))  ! SR/TODO make regular arrays (nsteps is now a parameter)
-  ALLOCATE(lwflx(batch_size, nlev, 2, nsteps))  ! SR/TODO make regular arrays (nsteps is now a parameter)
 
   ! READ-IN ICON GRID INFORMATION AND COMPUTE DOMAIN EXTENT
   icon_grid='icon_grid.nc'
@@ -177,11 +147,16 @@ program ecrad_ml
     ! TODO ABORT
   endif
 
-  ! fields for NetCDF data
   write(*,'(a)') 'allocate fields for NetCDF data'
   ALLOCATE(from_netcdf_2d(dim_len(idim_ncells), dim_len(idim_time), nvars_2d_rd))
   ALLOCATE(from_netcdf_3d(dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time), nvars_3d_rd))
-  write(*,'(a)') 'done allocating fields for NetCDF data'
+
+  write(*,'(a)') 'allocate fields for model data'
+  ALLOCATE(input_2d(batch_size, dummy_dim, nvars_2d_in))
+  ALLOCATE(input_3d(batch_size, dim_len(idim_height), dummy_dim, nvars_3d_in))  ! should be idim_height_2 for some vars
+  ALLOCATE(pred_flx(batch_size, dim_len(idim_height), 4))  ! should be idim_height_2
+  ALLOCATE(swflx(batch_size, dim_len(idim_height), 2, nsteps))  ! should be idim_height_2
+  ALLOCATE(lwflx(batch_size, dim_len(idim_height), 2, nsteps))  ! should be idim_height_2
 
   ! 2d fields
   write(*,'(a)') 'read 2D fields'
@@ -193,7 +168,6 @@ program ecrad_ml
   call read_nc_2d(netcdf_data_file, "tsfctrad",   from_netcdf_2d(:,:,6), dim_len(idim_ncells), dim_len(idim_time))
   call read_nc_2d(netcdf_data_file, "albvisdif",  from_netcdf_2d(:,:,7), dim_len(idim_ncells), dim_len(idim_time))
   call read_nc_2d(netcdf_data_file, "albnirdif",  from_netcdf_2d(:,:,8), dim_len(idim_ncells), dim_len(idim_time))
-  write(*,'(a)') 'done reading 2D fields'
 
   ! 3d fields
   write(*,'(a)') 'read 3D fields'
@@ -285,6 +259,8 @@ program ecrad_ml
   write(*,'(A)') 'STATISTICS'
   write(*,'(A)') ''
 
+  nlev = dim_len(idim_height)
+
   ! values below zero for SW
   counter(:) = 0
   DO step=1,nsteps
@@ -373,6 +349,9 @@ program ecrad_ml
   DEALLOCATE(from_netcdf_3d)
   DEALLOCATE(from_netcdf_2d)
   DEALLOCATE(abs_diff)
+  DEALLOCATE(input_3d)
+  DEALLOCATE(input_2d)
+  DEALLOCATE(pred_flx)
 
 CONTAINS
 
