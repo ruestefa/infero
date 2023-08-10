@@ -17,15 +17,15 @@ program ecrad_ml
   REAL (c_float), PARAMETER ::  pi = 3.14159265358979323846264338327950288
   REAL (c_float), PARAMETER ::  rad2deg   = 180.0/pi
 
-  ! SR/TODO Try reading these params from the input file instead of hardcoding them
-  ! SR/TODO Should just require swapping out the regular arrays for allocatables
-  ! define gridsize (icon grid indices)
-  !integer,parameter :: batch_size = 10
-  integer,parameter :: batch_size = 100
-  !integer,parameter :: batch_size = 1000
-  !integer,parameter :: batch_size = 10000
+  ! no. grid points passed to the model
+  integer :: batch_size = 100
+  integer :: s_idx, e_idx
   !integer,parameter :: batch_size = 81919
   !integer,parameter :: batch_size = 81920
+
+  ! no. vertical levels passed to the model
+  integer :: n_lev = 70
+  integer :: s_lev, e_lev
 
   ! character(100), parameter :: input_tensor_name_2d = "serving_default_input_22"
   ! character(100), parameter :: input_tensor_name_3d = "serving_default_input_23"
@@ -62,9 +62,7 @@ program ecrad_ml
   integer :: dim_len(ndims), grid_dim_len(14)
 
   ! indices
-  integer :: i, k, id_d
-  integer :: step, s_idx, e_idx
-  integer :: n_lev
+  integer :: i, k, id_d, step
   integer :: nc_time_idx(nsteps)
   integer :: counter(nsteps)
 
@@ -156,6 +154,11 @@ program ecrad_ml
     call ABORT()
   endif
 
+  s_idx = 1  ! SR/TMP
+  e_idx = batch_size  ! SR/TMP
+  s_lev = 1  ! SR/TMP
+  e_lev = n_lev  ! SR/TMP
+
   write(*,'(a)') 'allocate fields for NetCDF data'
   ALLOCATE(from_netcdf_2d(dim_len(idim_ncells), dim_len(idim_time), nvars_2d_rd))
   ALLOCATE(from_netcdf_3d(dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time), nvars_3d_rd))
@@ -164,10 +167,10 @@ program ecrad_ml
 
   write(*,'(a)') 'allocate fields for model data'
   ALLOCATE(input_2d(batch_size, dummy_dim, nvars_2d_in))
-  ALLOCATE(input_3d(batch_size, dim_len(idim_height), dummy_dim, nvars_3d_in))  ! should be idim_height_2 for some vars
-  ALLOCATE(pred_flx(batch_size, dim_len(idim_height), 4))  ! should be idim_height_2
-  ALLOCATE(swflx(batch_size, dim_len(idim_height), nsteps, 2))  ! should be idim_height_2
-  ALLOCATE(lwflx(batch_size, dim_len(idim_height), nsteps, 2))  ! should be idim_height_2
+  ALLOCATE(input_3d(batch_size, n_lev, dummy_dim, nvars_3d_in))
+  ALLOCATE(pred_flx(batch_size, n_lev, 4))
+  ALLOCATE(swflx(batch_size, n_lev, nsteps, 2))
+  ALLOCATE(lwflx(batch_size, n_lev, nsteps, 2))
   input_2d(:,:,:)   = 0.0_c_float
   input_3d(:,:,:,:) = 0.0_c_float
   pred_flx(:,:,:)   = 0.0_c_float
@@ -225,8 +228,8 @@ program ecrad_ml
     write(*,'(a,i1)') 'STEP ', step
 
     ! update input-tensors
-    input_2d(s_idx:e_idx,                         dummy_dim, 1:nvars_2d_in) = from_netcdf_2d(s_idx:e_idx,                         nc_time_idx(step), 1:nvars_2d_in)
-    input_3d(s_idx:e_idx, 1:dim_len(idim_height), dummy_dim, 1:nvars_3d_in) = from_netcdf_3d(s_idx:e_idx, 1:dim_len(idim_height), nc_time_idx(step), 1:nvars_3d_in)
+    input_2d(1:batch_size,          dummy_dim, 1:nvars_2d_in) = from_netcdf_2d(s_idx:e_idx,              nc_time_idx(step), 1:nvars_2d_in)
+    input_3d(1:batch_size, 1:n_lev, dummy_dim, 1:nvars_3d_in) = from_netcdf_3d(s_idx:e_idx, s_lev:e_lev, nc_time_idx(step), 1:nvars_3d_in)
 
     ! apply model
     write(*,'(a)') 'apply model'
@@ -237,8 +240,8 @@ program ecrad_ml
 
     ! store results in permanent fields
     write(*,'(a)') 'store results in permanent fields'
-    lwflx(s_idx:e_idx, 1:dim_len(idim_height), step, 1:2) = pred_flx(s_idx:e_idx, 1:dim_len(idim_height), 1:2)
-    swflx(s_idx:e_idx, 1:dim_len(idim_height), step, 1:2) = pred_flx(s_idx:e_idx, 1:dim_len(idim_height), 3:4)
+    lwflx(1:batch_size, 1:n_lev, step, 1:2) = pred_flx(1:batch_size, 1:n_lev, 1:2)
+    swflx(1:batch_size, 1:n_lev, step, 1:2) = pred_flx(1:batch_size, 1:n_lev, 3:4)
 
     ! input
     write(*,'(a)') 'compute stats of input vars'
@@ -267,9 +270,7 @@ program ecrad_ml
   write(*,'(A)') 'STATISTICS'
   write(*,'(A)') ''
 
-  n_lev = dim_len(idim_height)
-
-  ! values below zero for SW
+  ! count negative SW fluxes
   counter(:) = 0
   DO step=1,nsteps
     DO i=1,batch_size
@@ -290,21 +291,21 @@ program ecrad_ml
   ENDDO
 
   ! absolute difference
-  ALLOCATE(abs_diff(batch_size, dim_len(idim_time), dim_len(idim_height), nflxs))
+  ALLOCATE(abs_diff(batch_size, n_lev, nsteps, nflxs))
 
   write(*,'(A)') ''
   write(*,'(A)') '  Mean Absolute Error (MAE):'
   DO step=1,nsteps
-    abs_diff(:,:,step,1) = ABS(lwflx(:,:,step,1) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 7))  ! lwflux_up
-    abs_diff(:,:,step,2) = ABS(lwflx(:,:,step,2) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 8))  ! lwflux_dn
-    abs_diff(:,:,step,3) = ABS(swflx(:,:,step,1) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 9))  ! swflux_up
-    abs_diff(:,:,step,4) = ABS(swflx(:,:,step,2) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 10)) ! swflux_dn
+    abs_diff(1:batch_size, 1:n_lev, step, 1) = ABS(lwflx(1:batch_size, 1:n_lev, step, 1) - from_netcdf_3d(s_idx:e_idx, s_lev:e_lev, nc_time_idx(step), 7))  ! lwflux_up
+    abs_diff(1:batch_size, 1:n_lev, step, 2) = ABS(lwflx(1:batch_size, 1:n_lev, step, 2) - from_netcdf_3d(s_idx:e_idx, s_lev:e_lev, nc_time_idx(step), 8))  ! lwflux_dn
+    abs_diff(1:batch_size, 1:n_lev, step, 3) = ABS(swflx(1:batch_size, 1:n_lev, step, 1) - from_netcdf_3d(s_idx:e_idx, s_lev:e_lev, nc_time_idx(step), 9))  ! swflux_up
+    abs_diff(1:batch_size, 1:n_lev, step, 4) = ABS(swflx(1:batch_size, 1:n_lev, step, 2) - from_netcdf_3d(s_idx:e_idx, s_lev:e_lev, nc_time_idx(step), 10)) ! swflux_dn
 
     ! mean values
-    CALL mean_2d(abs_diff(:,:,step,1), mean_absolute_error(step, 1), batch_size, n_lev)
-    CALL mean_2d(abs_diff(:,:,step,2), mean_absolute_error(step, 2), batch_size, n_lev)
-    CALL mean_2d(abs_diff(:,:,step,3), mean_absolute_error(step, 3), batch_size, n_lev)
-    CALL mean_2d(abs_diff(:,:,step,4), mean_absolute_error(step, 4), batch_size, n_lev)
+    CALL mean_2d(abs_diff(1:batch_size, 1:n_lev, step, 1), mean_absolute_error(step, 1), batch_size, n_lev)
+    CALL mean_2d(abs_diff(1:batch_size, 1:n_lev, step, 2), mean_absolute_error(step, 2), batch_size, n_lev)
+    CALL mean_2d(abs_diff(1:batch_size, 1:n_lev, step, 3), mean_absolute_error(step, 3), batch_size, n_lev)
+    CALL mean_2d(abs_diff(1:batch_size, 1:n_lev, step, 4), mean_absolute_error(step, 4), batch_size, n_lev)
 
     write(*,'(A)') ''
     write(*,'(A,A)') '    ',timestamp(step)
@@ -322,20 +323,20 @@ program ecrad_ml
     write(*,'(A)') ''
     write(*,'(A,A)') '  ',timestamp(step)
     write(*,'(A)') '    Upwards:'
-    write(*,'(A,F8.2,A,F8.2)') '     SW (all): MAX ', MAXVAL(swflx(:, :,  step, 1)),' MIN ', MINVAL(swflx(:, :,  step, 1))
-    write(*,'(A,F8.2,A,F8.2)') '     LW (all): MAX ', MAXVAL(lwflx(:, :,  step, 1)),' MIN ', MINVAL(lwflx(:, :,  step, 1))
-    write(*,'(A,F8.2,A,F8.2)') '     SW (sfc): MAX ', MAXVAL(swflx(:, 1,  step, 1)),' MIN ', MINVAL(swflx(:, 1,  step, 1))
-    write(*,'(A,F8.2,A,F8.2)') '     LW (sfc): MAX ', MAXVAL(lwflx(:, 1,  step, 1)),' MIN ', MINVAL(lwflx(:, 1,  step, 1))
-    write(*,'(A,F8.2,A,F8.2)') '     SW (toa): MAX ', MAXVAL(swflx(:, 60, step, 1)),' MIN ', MINVAL(swflx(:, 60, step, 1))
-    write(*,'(A,F8.2,A,F8.2)') '     LW (toa): MAX ', MAXVAL(lwflx(:, 60, step, 1)),' MIN ', MINVAL(lwflx(:, 60, step, 1))
+    write(*,'(A,F8.2,A,F8.2)') '     SW (all): MAX ', MAXVAL(swflx(1:batch_size,1:n_lev,step,1)),' MIN ', MINVAL(swflx(1:batch_size,1:n_lev,step,1))
+    write(*,'(A,F8.2,A,F8.2)') '     LW (all): MAX ', MAXVAL(lwflx(1:batch_size,1:n_lev,step,1)),' MIN ', MINVAL(lwflx(1:batch_size,1:n_lev,step,1))
+    write(*,'(A,F8.2,A,F8.2)') '     SW (sfc): MAX ', MAXVAL(swflx(1:batch_size,1,     step,1)),' MIN ', MINVAL(swflx(1:batch_size,1     ,step,1))
+    write(*,'(A,F8.2,A,F8.2)') '     LW (sfc): MAX ', MAXVAL(lwflx(1:batch_size,1,     step,1)),' MIN ', MINVAL(lwflx(1:batch_size,1     ,step,1))
+    write(*,'(A,F8.2,A,F8.2)') '     SW (toa): MAX ', MAXVAL(swflx(1:batch_size,  n_lev,step,1)),' MIN ', MINVAL(swflx(1:batch_size,  n_lev,step,1))
+    write(*,'(A,F8.2,A,F8.2)') '     LW (toa): MAX ', MAXVAL(lwflx(1:batch_size,  n_lev,step,1)),' MIN ', MINVAL(lwflx(1:batch_size,  n_lev,step,1))
     write(*,'(A)') ''
     write(*,'(A)') '    Downwards:'
-    write(*,'(A,F8.2,A,F8.2)') '     SW (all): MAX ', MAXVAL(swflx(:, :,  step, 2)),' MIN ', MINVAL(swflx(:, :,  step, 2))
-    write(*,'(A,F8.2,A,F8.2)') '     LW (all): MAX ', MAXVAL(lwflx(:, :,  step, 2)),' MIN ', MINVAL(lwflx(:, :,  step, 2))
-    write(*,'(A,F8.2,A,F8.2)') '     SW (sfc): MAX ', MAXVAL(swflx(:, 1,  step, 2)),' MIN ', MINVAL(swflx(:, 1,  step, 2))
-    write(*,'(A,F8.2,A,F8.2)') '     LW (sfc): MAX ', MAXVAL(lwflx(:, 1,  step, 2)),' MIN ', MINVAL(lwflx(:, 1,  step, 2))
-    write(*,'(A,F8.2,A,F8.2)') '     SW (toa): MAX ', MAXVAL(swflx(:, 60, step, 2)),' MIN ', MINVAL(swflx(:, 60, step, 2))
-    write(*,'(A,F8.2,A,F8.2)') '     LW (toa): MAX ', MAXVAL(lwflx(:, 60, step, 2)),' MIN ', MINVAL(lwflx(:, 60, step, 2))
+    write(*,'(A,F8.2,A,F8.2)') '     SW (all): MAX ', MAXVAL(swflx(1:batch_size,1:n_lev,step,2)),' MIN ', MINVAL(swflx(1:batch_size,1:n_lev,step,2))
+    write(*,'(A,F8.2,A,F8.2)') '     LW (all): MAX ', MAXVAL(lwflx(1:batch_size,1:n_lev,step,2)),' MIN ', MINVAL(lwflx(1:batch_size,1:n_lev,step,2))
+    write(*,'(A,F8.2,A,F8.2)') '     SW (sfc): MAX ', MAXVAL(swflx(1:batch_size,1,     step,2)),' MIN ', MINVAL(swflx(1:batch_size,1,       step,2))
+    write(*,'(A,F8.2,A,F8.2)') '     LW (sfc): MAX ', MAXVAL(lwflx(1:batch_size,1,     step,2)),' MIN ', MINVAL(lwflx(1:batch_size,1,       step,2))
+    write(*,'(A,F8.2,A,F8.2)') '     SW (toa): MAX ', MAXVAL(swflx(1:batch_size,  n_lev,step,2)),' MIN ', MINVAL(swflx(1:batch_size,  n_lev,step,2))
+    write(*,'(A,F8.2,A,F8.2)') '     LW (toa): MAX ', MAXVAL(lwflx(1:batch_size,  n_lev,step,2)),' MIN ', MINVAL(lwflx(1:batch_size,  n_lev,step,2))
   ENDDO
 
   ! CLEANUP
