@@ -118,11 +118,12 @@ program ecrad_ml
   call read_nc_1d(icon_grid, "clat", clat, grid_dim_len(1))
   call read_nc_1d(icon_grid, "clon", clon, grid_dim_len(1))
 
+  s_idx = 1
+  e_idx = batch_size
+
   ! compute domain extent
-  DO i=1,batch_size+1
-    lon(i) = rad2deg * clon(i)
-    lat(i) = rad2deg * clat(i)
-  ENDDO
+  lon(1:batch_size) = rad2deg * clon(s_idx:e_idx)
+  lat(1:batch_size) = rad2deg * clat(s_idx:e_idx)
 
   lon_max = MAXVAL(lon(:))
   lon_min = MINVAL(lon(:))
@@ -152,13 +153,13 @@ program ecrad_ml
   ! SR/TODO properly deal w/ height_2 fields (now using idim_height everywhere)
   if (dim_len(idim_height) /= dim_len(idim_height_2)) then
     write(*,'(a,2i6)') 'ERROR: height != height_2: ', dim_len(idim_height), dim_len(idim_height_2)
-    ! TODO ABORT
+    call ABORT()
   endif
 
   write(*,'(a)') 'allocate fields for NetCDF data'
   ALLOCATE(from_netcdf_2d(dim_len(idim_ncells), dim_len(idim_time), nvars_2d_rd))
   ALLOCATE(from_netcdf_3d(dim_len(idim_ncells), dim_len(idim_height), dim_len(idim_time), nvars_3d_rd))
-  from_netcdf_2d(:,:,:) = 0.0_c_float
+  from_netcdf_2d(:,:,:)   = 0.0_c_float
   from_netcdf_3d(:,:,:,:) = 0.0_c_float
 
   write(*,'(a)') 'allocate fields for model data'
@@ -167,11 +168,11 @@ program ecrad_ml
   ALLOCATE(pred_flx(batch_size, dim_len(idim_height), 4))  ! should be idim_height_2
   ALLOCATE(swflx(batch_size, dim_len(idim_height), 2, nsteps))  ! should be idim_height_2
   ALLOCATE(lwflx(batch_size, dim_len(idim_height), 2, nsteps))  ! should be idim_height_2
-  input_2d(:,:,:) = 0.0_c_float
+  input_2d(:,:,:)   = 0.0_c_float
   input_3d(:,:,:,:) = 0.0_c_float
-  pred_flx(:,:,:) = 0.0_c_float
-  swflx(:,:,:,:) = 0.0_c_float
-  lwflx(:,:,:,:) = 0.0_c_float
+  pred_flx(:,:,:)   = 0.0_c_float
+  swflx   (:,:,:,:) = 0.0_c_float
+  lwflx   (:,:,:,:) = 0.0_c_float
 
   ! 2d fields
   write(*,'(a)') 'read 2D fields'
@@ -219,19 +220,13 @@ program ecrad_ml
   call infero_check(oset%push_tensor(pred_flx, output_2d_name))
 
   ! TIMESTEP
-  s_idx = 1
-  e_idx = batch_size
-  ! SR/TODO remove these helper variables?
-
   write(*,'(a)') 'run model'
   DO step=1,nsteps
     write(*,'(a,i1)') 'STEP ', step
 
     ! update input-tensors
-    input_2d(s_idx:e_idx, dummy_dim, 1:nvars_2d_in) = &
-      & from_netcdf_2d(s_idx:e_idx, nc_time_idx(step), 1:nvars_2d_in)
-    input_3d(s_idx:e_idx, 1:dim_len(idim_height), dummy_dim, 1:nvars_3d_in) = &
-      & from_netcdf_3d(s_idx:e_idx, 1:dim_len(idim_height), nc_time_idx(step), 1:nvars_3d_in)
+    input_2d(s_idx:e_idx,                         dummy_dim, 1:nvars_2d_in) = from_netcdf_2d(s_idx:e_idx,                         nc_time_idx(step), 1:nvars_2d_in)
+    input_3d(s_idx:e_idx, 1:dim_len(idim_height), dummy_dim, 1:nvars_3d_in) = from_netcdf_3d(s_idx:e_idx, 1:dim_len(idim_height), nc_time_idx(step), 1:nvars_3d_in)
 
     ! apply model
     write(*,'(a)') 'apply model'
@@ -242,10 +237,8 @@ program ecrad_ml
 
     ! store results in permanent fields
     write(*,'(a)') 'store results in permanent fields'
-    lwflx(s_idx:e_idx, 1:dim_len(idim_height), 1:2, step) = &
-      & pred_flx(s_idx:e_idx, 1:dim_len(idim_height), 1:2)
-    swflx(s_idx:e_idx, 1:dim_len(idim_height), 1:2, step) = &
-      & pred_flx(s_idx:e_idx, 1:dim_len(idim_height), 3:4)
+    lwflx(s_idx:e_idx, 1:dim_len(idim_height), 1:2, step) = pred_flx(s_idx:e_idx, 1:dim_len(idim_height), 1:2)
+    swflx(s_idx:e_idx, 1:dim_len(idim_height), 1:2, step) = pred_flx(s_idx:e_idx, 1:dim_len(idim_height), 3:4)
 
     ! input
     write(*,'(a)') 'compute stats of input vars'
@@ -505,5 +498,6 @@ SUBROUTINE check(istatus)
   INTEGER, INTENT (IN) :: istatus
   IF (istatus /= nf90_noerr) THEN
     write(*,'(A)') 'ERROR: '//TRIM((nf90_strerror(istatus)))
+    call ABORT()
   END IF
 END SUBROUTINE check
