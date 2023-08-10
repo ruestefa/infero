@@ -64,7 +64,7 @@ program ecrad_ml
   ! indices
   integer :: i, k, id_d
   integer :: step, s_idx, e_idx
-  integer :: nlev
+  integer :: n_lev
   integer :: nc_time_idx(nsteps)
   integer :: counter(nsteps)
 
@@ -267,13 +267,13 @@ program ecrad_ml
   write(*,'(A)') 'STATISTICS'
   write(*,'(A)') ''
 
-  nlev = dim_len(idim_height)
+  n_lev = dim_len(idim_height)
 
   ! values below zero for SW
   counter(:) = 0
   DO step=1,nsteps
     DO i=1,batch_size
-      DO k=1,nlev
+      DO k=1,n_lev
         DO id_d=1,2
           IF(swflx(i,k,id_d,step) < 0.0) THEN
             counter(step) = counter(step) + 1
@@ -283,9 +283,9 @@ program ecrad_ml
     ENDDO
   ENDDO
 
-  write(*,'(I7,A)') batch_size*nlev*2,' datapoints scanned for each step of SW-flux'
+  write(*,'(I7,A)') batch_size*n_lev*2,' datapoints scanned for each step of SW-flux'
   DO step=1,nsteps
-    percentage = MAX(0.0,100.0 * REAL(counter(step))/REAL((batch_size*nlev*2)))
+    percentage = MAX(0.0,100.0 * REAL(counter(step))/REAL((batch_size*n_lev*2)))
     write(*,'(F6.1,A,A)') percentage, '% values below 0.0 for ',timestamp(step)
   ENDDO
 
@@ -301,10 +301,10 @@ program ecrad_ml
     abs_diff(:,:,4,step) = ABS(swflx(:,:,2,step) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 10)) ! swflux_dn
 
     ! mean values
-    CALL mean_2d(abs_diff(:,:,1,step), mean_absolute_error(1,step), batch_size, nlev)
-    CALL mean_2d(abs_diff(:,:,2,step), mean_absolute_error(2,step), batch_size, nlev)
-    CALL mean_2d(abs_diff(:,:,3,step), mean_absolute_error(3,step), batch_size, nlev)
-    CALL mean_2d(abs_diff(:,:,4,step), mean_absolute_error(4,step), batch_size, nlev)
+    CALL mean_2d(abs_diff(:,:,1,step), mean_absolute_error(1,step), batch_size, n_lev)
+    CALL mean_2d(abs_diff(:,:,2,step), mean_absolute_error(2,step), batch_size, n_lev)
+    CALL mean_2d(abs_diff(:,:,3,step), mean_absolute_error(3,step), batch_size, n_lev)
+    CALL mean_2d(abs_diff(:,:,4,step), mean_absolute_error(4,step), batch_size, n_lev)
 
     write(*,'(A)') ''
     write(*,'(A,A)') '    ',timestamp(step)
