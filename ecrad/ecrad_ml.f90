@@ -18,12 +18,16 @@ program ecrad_ml
   REAL (c_float), PARAMETER ::  rad2deg   = 180.0/pi
 
   ! no. grid points passed to the model
+  ! set to zero to use all available grid points
   integer :: batch_size = 100
+  !integer :: batch_size = 81919
+  !integer :: batch_size = 81920
+  !integer :: batch_size = 0
   integer :: s_idx, e_idx
-  !integer,parameter :: batch_size = 81919
-  !integer,parameter :: batch_size = 81920
 
   ! no. vertical levels passed to the model
+  ! set to zero to use all available levels
+  ! positive/negative values select levels from the TOA/surface
   integer :: n_lev = 70
   integer :: s_lev, e_lev
 
@@ -154,10 +158,47 @@ program ecrad_ml
     call ABORT()
   endif
 
+  ! set/check batch_size, s_idx and e_idx
+  if (batch_size == 0) then
+    batch_size = dim_len(idim_ncells)
+  elseif (batch_size < 0) then
+    write(*,'(a)') 'WARNING: batch_size should be positive'
+    batch_size = -batch_size
+  endif
+  if (batch_size > dim_len(idim_ncells)) then
+    write(*,'(a)') 'WARNING: batch_size too large'
+    batch_size = dim_len(idim_ncells)
+  endif
   s_idx = 1  ! SR/TMP
   e_idx = batch_size  ! SR/TMP
-  s_lev = 1  ! SR/TMP
-  e_lev = n_lev  ! SR/TMP
+  write(*,'(a,i6)') 'batch_size : ', batch_size
+  write(*,'(a,i6)') 's_idx      : ', s_idx
+  write(*,'(a,i6)') 'e_idx      : ', e_idx
+
+  ! set/check n_lev, s_lev and e_lev
+  if (n_lev == 0) then
+    n_lev = dim_len(idim_height)
+    s_lev = 1
+    e_lev = n_lev
+  else
+    if (ABS(n_lev) > dim_len(idim_height)) then
+      write(*,'(a)') 'WARNING: n_lev too large'
+      n_lev = SIGN(dim_len(idim_height), n_lev)
+    endif
+    if (n_lev > 0) then
+      s_lev = 1
+      e_lev = n_lev
+    else
+      n_lev = -n_lev
+      e_lev = dim_len(idim_height)
+      s_lev = e_lev - n_lev
+    endif
+  endif
+  write(*,'(a,i6)') 'n_lev      : ', n_lev
+  write(*,'(a,i6)') 's_lev      : ', s_lev
+  write(*,'(a,i6)') 'e_lev      : ', e_lev
+
+  write(*,'(a)') ''
 
   write(*,'(a)') 'allocate fields for NetCDF data'
   ALLOCATE(from_netcdf_2d(dim_len(idim_ncells), dim_len(idim_time), nvars_2d_rd))
