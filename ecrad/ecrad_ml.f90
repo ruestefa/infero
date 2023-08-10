@@ -111,8 +111,8 @@ program ecrad_ml
   !ALLOCATE(neighbor_cell_index(grid_dim_len(1), grid_dim_len(5)))
   ALLOCATE(clat(grid_dim_len(1)))
   ALLOCATE(clon(grid_dim_len(1)))
-  ALLOCATE(lat(batch_size + 1))
-  ALLOCATE(lon(batch_size + 1))
+  ALLOCATE(lat(batch_size))
+  ALLOCATE(lon(batch_size))
 
   !call read_nc_2d(icon_grid, "neighbor_cell_index", neighbor_cell_index(:,:), grid_dim_len(1), grid_dim_len(5))
   call read_nc_1d(icon_grid, "clat", clat, grid_dim_len(1))
@@ -290,7 +290,7 @@ program ecrad_ml
   ENDDO
 
   ! absolute difference
-  ALLOCATE(abs_diff(batch_size+1, dim_len(idim_time), dim_len(idim_height), nflxs))
+  ALLOCATE(abs_diff(batch_size, dim_len(idim_time), dim_len(idim_height), nflxs))
 
   write(*,'(A)') ''
   write(*,'(A)') '  Mean Absolute Error (MAE):'
