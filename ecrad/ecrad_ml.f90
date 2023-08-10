@@ -411,17 +411,17 @@ SUBROUTINE read_nc_1d(infile,varname,idata,nx)
   INTEGER(KIND=4), DIMENSION(1) :: dimids
   INTEGER(KIND=4) :: ncid, ndims, varid
   CHARACTER(LEN=*), INTENT(IN) :: infile, varname
-  write(*,'(a)') ''
-  write(*,'(a)') 'read_nc_1d'
-  write(*,'(A)')     ' infile  : ' // TRIM(infile)
-  write(*,'(A)')     ' varname : ' // TRIM(varname)
-  write(*,'(A,I6)')  ' nx      : ', nx
+  write(*,'(a)') 'read_nc_1d: ' // TRIM(infile) // ' -> ' // TRIM(varname)
+  ! write(*,'(A)')     ' infile  : ' // TRIM(infile)
+  ! write(*,'(A)')     ' varname : ' // TRIM(varname)
+  ! write(*,'(A,I6)')  ' nx      : ', nx
   ! Get the values of the coordinates
   CALL check(nf90_open(TRIM(infile), nf90_nowrite, ncid))
   CALL check(nf90_inq_varid(ncid,TRIM(varname),varid))
   CALL check(nf90_inquire_variable(ncid=ncid,varid=varid,ndims=ndims,dimids=dimids))
-  write(*,'(A,I6)')  ' ndims   : ', ndims
-  write(*,'(A,1I6)') ' dimids  : ', dimids
+  ! write(*,'(A,I6)')  ' ndims   : ', ndims
+  ! write(*,'(A,1I6)') ' dimids  : ', dimids
+  ! write(*,'(a)') ''
   ! Get the variable
   CALL check(nf90_get_var(ncid,varid,idata))
   CALL check(nf90_close(ncid))
@@ -435,17 +435,17 @@ SUBROUTINE read_nc_2d(infile,varname,idata,nx,ny)
   INTEGER(KIND=4), DIMENSION(2) :: dimids
   INTEGER(KIND=4) :: ncid, ndims, varid
   CHARACTER(LEN=*), INTENT(IN) :: infile, varname
-  write(*,'(a)') ''
-  write(*,'(a)') 'read_nc_2d'
-  write(*,'(A)')     ' infile  : ' // TRIM(infile)
-  write(*,'(A)')     ' varname : ' // TRIM(varname)
-  write(*,'(A,I6)')  ' nx      : ', nx
-  write(*,'(A,I6)')  ' ny      : ', ny
+  write(*,'(a)') 'read_nc_2d: ' // TRIM(infile) // ' -> ' // TRIM(varname)
+  ! write(*,'(A)')     ' infile  : ' // TRIM(infile)
+  ! write(*,'(A)')     ' varname : ' // TRIM(varname)
+  ! write(*,'(A,I6)')  ' nx      : ', nx
+  ! write(*,'(A,I6)')  ' ny      : ', ny
   CALL check(nf90_open(TRIM(infile), nf90_nowrite, ncid))
   CALL check(nf90_inq_varid(ncid,TRIM(varname),varid))
   CALL check(nf90_inquire_variable(ncid=ncid,varid=varid,ndims=ndims,dimids=dimids))
-  write(*,'(A,I6)')  ' ndims   : ', ndims
-  write(*,'(A,2I6)') ' dimids  : ', dimids
+  ! write(*,'(A,I6)')  ' ndims   : ', ndims
+  ! write(*,'(A,2I6)') ' dimids  : ', dimids
+  ! write(*,'(a)') ''
   ! Get the variable
   CALL check(nf90_get_var(ncid,varid,idata))
   CALL check(nf90_close(ncid))
@@ -459,21 +459,21 @@ SUBROUTINE read_nc_3d(infile,varname,idata,nx,ny,nz)
   INTEGER(KIND=4), DIMENSION(3) :: dimids
   INTEGER(KIND=4) :: ncid, ndims, varid
   CHARACTER(LEN=*), INTENT(IN) :: infile, varname
-  write(*,'(a)') ''
-  write(*,'(a)') 'read_nc_3d'
-  write(*,'(A)')     ' infile  : ' // TRIM(infile)
-  write(*,'(A)')     ' varname : ' // TRIM(varname)
-  write(*,'(A,I6)')  ' nx      : ', nx
-  write(*,'(A,I6)')  ' ny      : ', ny
-  write(*,'(A,I6)')  ' nz      : ', nz
+  write(*,'(a)') 'read_nc_3d: ' // TRIM(infile) // ' -> ' // TRIM(varname)
+  ! write(*,'(A)')     ' infile  : ' // TRIM(infile)
+  ! write(*,'(A)')     ' varname : ' // TRIM(varname)
+  ! write(*,'(A,I6)')  ' nx      : ', nx
+  ! write(*,'(A,I6)')  ' ny      : ', ny
+  ! write(*,'(A,I6)')  ' nz      : ', nz
   CALL check(nf90_open(TRIM(infile), nf90_nowrite, ncid))
   ! Get the values of the coordinates
   !CALL check(nf90_inquire_variable(ncid,1,vname,xtype,ndims,dimids))
   CALL check(nf90_inq_varid(ncid,TRIM(varname),varid))
   CALL check(nf90_inquire_variable(ncid=ncid,varid=varid,ndims=ndims))
   CALL check(nf90_inquire_variable(ncid=ncid,varid=varid,ndims=ndims,dimids=dimids))
-  write(*,'(A,I6)')  ' ndims   : ', ndims
-  write(*,'(A,3I6)') ' dimids  : ', dimids
+  ! write(*,'(A,I6)')  ' ndims   : ', ndims
+  ! write(*,'(A,3I6)') ' dimids  : ', dimids
+  ! write(*,'(a)') ''
   CALL check(nf90_get_var(ncid,varid,idata))
   CALL check(nf90_close(ncid))
 END SUBROUTINE read_nc_3d
