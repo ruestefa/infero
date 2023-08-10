@@ -77,7 +77,7 @@ program ecrad_ml
   real(c_float), allocatable :: lwflx(:,:,:,:)
   real(c_float), allocatable :: clat(:), clon(:)
   real(c_float), allocatable :: lat(:), lon(:)
-  real(c_float) :: mean_absolute_error(nflxs,nsteps)
+  real(c_float) :: mean_absolute_error(nsteps,nflxs)
 
   ! scalars
   real(c_float) :: percentage, lat_min, lat_max, lon_min, lon_max
@@ -166,8 +166,8 @@ program ecrad_ml
   ALLOCATE(input_2d(batch_size, dummy_dim, nvars_2d_in))
   ALLOCATE(input_3d(batch_size, dim_len(idim_height), dummy_dim, nvars_3d_in))  ! should be idim_height_2 for some vars
   ALLOCATE(pred_flx(batch_size, dim_len(idim_height), 4))  ! should be idim_height_2
-  ALLOCATE(swflx(batch_size, dim_len(idim_height), 2, nsteps))  ! should be idim_height_2
-  ALLOCATE(lwflx(batch_size, dim_len(idim_height), 2, nsteps))  ! should be idim_height_2
+  ALLOCATE(swflx(batch_size, dim_len(idim_height), nsteps, 2))  ! should be idim_height_2
+  ALLOCATE(lwflx(batch_size, dim_len(idim_height), nsteps, 2))  ! should be idim_height_2
   input_2d(:,:,:)   = 0.0_c_float
   input_3d(:,:,:,:) = 0.0_c_float
   pred_flx(:,:,:)   = 0.0_c_float
@@ -237,8 +237,8 @@ program ecrad_ml
 
     ! store results in permanent fields
     write(*,'(a)') 'store results in permanent fields'
-    lwflx(s_idx:e_idx, 1:dim_len(idim_height), 1:2, step) = pred_flx(s_idx:e_idx, 1:dim_len(idim_height), 1:2)
-    swflx(s_idx:e_idx, 1:dim_len(idim_height), 1:2, step) = pred_flx(s_idx:e_idx, 1:dim_len(idim_height), 3:4)
+    lwflx(s_idx:e_idx, 1:dim_len(idim_height), step, 1:2) = pred_flx(s_idx:e_idx, 1:dim_len(idim_height), 1:2)
+    swflx(s_idx:e_idx, 1:dim_len(idim_height), step, 1:2) = pred_flx(s_idx:e_idx, 1:dim_len(idim_height), 3:4)
 
     ! input
     write(*,'(a)') 'compute stats of input vars'
@@ -295,25 +295,25 @@ program ecrad_ml
   write(*,'(A)') ''
   write(*,'(A)') '  Mean Absolute Error (MAE):'
   DO step=1,nsteps
-    abs_diff(:,:,1,step) = ABS(lwflx(:,:,1,step) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 7))  ! lwflux_up
-    abs_diff(:,:,2,step) = ABS(lwflx(:,:,2,step) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 8))  ! lwflux_dn
-    abs_diff(:,:,3,step) = ABS(swflx(:,:,1,step) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 9))  ! swflux_up
-    abs_diff(:,:,4,step) = ABS(swflx(:,:,2,step) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 10)) ! swflux_dn
+    abs_diff(:,:,step,1) = ABS(lwflx(:,:,step,1) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 7))  ! lwflux_up
+    abs_diff(:,:,step,2) = ABS(lwflx(:,:,step,2) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 8))  ! lwflux_dn
+    abs_diff(:,:,step,3) = ABS(swflx(:,:,step,1) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 9))  ! swflux_up
+    abs_diff(:,:,step,4) = ABS(swflx(:,:,step,2) - from_netcdf_3d(s_idx:e_idx, :, nc_time_idx(step), 10)) ! swflux_dn
 
     ! mean values
-    CALL mean_2d(abs_diff(:,:,1,step), mean_absolute_error(1,step), batch_size, n_lev)
-    CALL mean_2d(abs_diff(:,:,2,step), mean_absolute_error(2,step), batch_size, n_lev)
-    CALL mean_2d(abs_diff(:,:,3,step), mean_absolute_error(3,step), batch_size, n_lev)
-    CALL mean_2d(abs_diff(:,:,4,step), mean_absolute_error(4,step), batch_size, n_lev)
+    CALL mean_2d(abs_diff(:,:,step,1), mean_absolute_error(step, 1), batch_size, n_lev)
+    CALL mean_2d(abs_diff(:,:,step,2), mean_absolute_error(step, 2), batch_size, n_lev)
+    CALL mean_2d(abs_diff(:,:,step,3), mean_absolute_error(step, 3), batch_size, n_lev)
+    CALL mean_2d(abs_diff(:,:,step,4), mean_absolute_error(step, 4), batch_size, n_lev)
 
     write(*,'(A)') ''
     write(*,'(A,A)') '    ',timestamp(step)
     write(*,'(A)') '      Upwards:'
-    write(*,'(A,F8.2)') '        SW (all levels): ',mean_absolute_error(3,step)
-    write(*,'(A,F8.2)') '        LW (all levels): ',mean_absolute_error(1,step)
+    write(*,'(A,F8.2)') '        SW (all levels): ', mean_absolute_error(step, 3)
+    write(*,'(A,F8.2)') '        LW (all levels): ', mean_absolute_error(step, 1)
     write(*,'(A)') '      Downwards:'
-    write(*,'(A,F8.2)') '        SW (all levels): ',mean_absolute_error(4,step)
-    write(*,'(A,F8.2)') '        LW (all levels): ',mean_absolute_error(2,step)
+    write(*,'(A,F8.2)') '        SW (all levels): ', mean_absolute_error(step, 4)
+    write(*,'(A,F8.2)') '        LW (all levels): ', mean_absolute_error(step, 2)
   ENDDO
 
   write(*,'(A)') ''
@@ -322,20 +322,20 @@ program ecrad_ml
     write(*,'(A)') ''
     write(*,'(A,A)') '  ',timestamp(step)
     write(*,'(A)') '    Upwards:'
-    write(*,'(A,F8.2,A,F8.2)') '     SW (all levels): MAX ',MAXVAL(swflx(:,:,1,step)),' MIN ',MINVAL(swflx(:,:,1,step))
-    write(*,'(A,F8.2,A,F8.2)') '     LW (all levels): MAX ',MAXVAL(lwflx(:,:,1,step)),' MIN ', MINVAL(lwflx(:,:,1,step))
-    write(*,'(A,F8.2,A,F8.2)') '     SW (sfc): MAX ',MAXVAL(swflx(:,1,1,step)),' MIN ', MINVAL(swflx(:,1,1,step))
-    write(*,'(A,F8.2,A,F8.2)') '     LW (sfc): MAX ',MAXVAL(lwflx(:,1,1,step)),' MIN ', MINVAL(lwflx(:,1,1,step))
-    write(*,'(A,F8.2,A,F8.2)') '     SW (toa): MAX ',MAXVAL(swflx(:,60,1,step)),' MIN ', MINVAL(swflx(:,60,1,step))
-    write(*,'(A,F8.2,A,F8.2)') '     LW (toa): MAX ',MAXVAL(lwflx(:,60,1,step)),' MIN ', MINVAL(lwflx(:,60,1,step))
+    write(*,'(A,F8.2,A,F8.2)') '     SW (all): MAX ', MAXVAL(swflx(:, :,  step, 1)),' MIN ', MINVAL(swflx(:, :,  step, 1))
+    write(*,'(A,F8.2,A,F8.2)') '     LW (all): MAX ', MAXVAL(lwflx(:, :,  step, 1)),' MIN ', MINVAL(lwflx(:, :,  step, 1))
+    write(*,'(A,F8.2,A,F8.2)') '     SW (sfc): MAX ', MAXVAL(swflx(:, 1,  step, 1)),' MIN ', MINVAL(swflx(:, 1,  step, 1))
+    write(*,'(A,F8.2,A,F8.2)') '     LW (sfc): MAX ', MAXVAL(lwflx(:, 1,  step, 1)),' MIN ', MINVAL(lwflx(:, 1,  step, 1))
+    write(*,'(A,F8.2,A,F8.2)') '     SW (toa): MAX ', MAXVAL(swflx(:, 60, step, 1)),' MIN ', MINVAL(swflx(:, 60, step, 1))
+    write(*,'(A,F8.2,A,F8.2)') '     LW (toa): MAX ', MAXVAL(lwflx(:, 60, step, 1)),' MIN ', MINVAL(lwflx(:, 60, step, 1))
     write(*,'(A)') ''
     write(*,'(A)') '    Downwards:'
-    write(*,'(A,F8.2,A,F8.2)') '     SW (all levels): MAX ',MAXVAL(swflx(:,:,2,step)),' MIN ', MINVAL(swflx(:,:,2,step))
-    write(*,'(A,F8.2,A,F8.2)') '     LW (all levels): MAX ',MAXVAL(lwflx(:,:,2,step)),' MIN ', MINVAL(lwflx(:,:,2,step))
-    write(*,'(A,F8.2,A,F8.2)') '     SW (sfc): MAX ',MAXVAL(swflx(:,1,2,step)),' MIN ', MINVAL(swflx(:,1,2,step))
-    write(*,'(A,F8.2,A,F8.2)') '     LW (sfc): MAX ',MAXVAL(lwflx(:,1,2,step)),' MIN ', MINVAL(lwflx(:,1,2,step))
-    write(*,'(A,F8.2,A,F8.2)') '     SW (toa): MAX ',MAXVAL(swflx(:,60,2,step)),' MIN ', MINVAL(swflx(:,60,2,step))
-    write(*,'(A,F8.2,A,F8.2)') '     LW (toa): MAX ',MAXVAL(lwflx(:,60,2,step)),' MIN ', MINVAL(lwflx(:,60,2,step))
+    write(*,'(A,F8.2,A,F8.2)') '     SW (all): MAX ', MAXVAL(swflx(:, :,  step, 2)),' MIN ', MINVAL(swflx(:, :,  step, 2))
+    write(*,'(A,F8.2,A,F8.2)') '     LW (all): MAX ', MAXVAL(lwflx(:, :,  step, 2)),' MIN ', MINVAL(lwflx(:, :,  step, 2))
+    write(*,'(A,F8.2,A,F8.2)') '     SW (sfc): MAX ', MAXVAL(swflx(:, 1,  step, 2)),' MIN ', MINVAL(swflx(:, 1,  step, 2))
+    write(*,'(A,F8.2,A,F8.2)') '     LW (sfc): MAX ', MAXVAL(lwflx(:, 1,  step, 2)),' MIN ', MINVAL(lwflx(:, 1,  step, 2))
+    write(*,'(A,F8.2,A,F8.2)') '     SW (toa): MAX ', MAXVAL(swflx(:, 60, step, 2)),' MIN ', MINVAL(swflx(:, 60, step, 2))
+    write(*,'(A,F8.2,A,F8.2)') '     LW (toa): MAX ', MAXVAL(lwflx(:, 60, step, 2)),' MIN ', MINVAL(lwflx(:, 60, step, 2))
   ENDDO
 
   ! CLEANUP
