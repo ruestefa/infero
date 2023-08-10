@@ -71,7 +71,7 @@ program ecrad_ml
   ! data fields
   real(c_float), allocatable :: from_netcdf_2d(:,:,:)
   real(c_float), allocatable :: from_netcdf_3d(:,:,:,:)
-  real(c_float), allocatable :: neighbor_cell_index(:,:)
+  !real(c_float), allocatable :: neighbor_cell_index(:,:)
   real(c_float), allocatable :: abs_diff(:,:,:,:)
   real(c_float), allocatable :: swflx(:,:,:,:)
   real(c_float), allocatable :: lwflx(:,:,:,:)
@@ -108,13 +108,13 @@ program ecrad_ml
 
   ! fields with icon-grid information
   write(*,'(a)') 'allocate fields with icon-grid information'
-  ALLOCATE(neighbor_cell_index(grid_dim_len(1), grid_dim_len(5)))
+  !ALLOCATE(neighbor_cell_index(grid_dim_len(1), grid_dim_len(5)))
   ALLOCATE(clat(grid_dim_len(1)))
   ALLOCATE(clon(grid_dim_len(1)))
   ALLOCATE(lat(batch_size + 1))
   ALLOCATE(lon(batch_size + 1))
 
-  call read_nc_2d(icon_grid, "neighbor_cell_index", neighbor_cell_index(:,:), grid_dim_len(1), grid_dim_len(5))
+  !call read_nc_2d(icon_grid, "neighbor_cell_index", neighbor_cell_index(:,:), grid_dim_len(1), grid_dim_len(5))
   call read_nc_1d(icon_grid, "clat", clat, grid_dim_len(1))
   call read_nc_1d(icon_grid, "clon", clon, grid_dim_len(1))
 
@@ -349,7 +349,7 @@ program ecrad_ml
   ! deallocate
   DEALLOCATE(swflx)
   DEALLOCATE(lwflx)
-  DEALLOCATE(neighbor_cell_index)
+  !DEALLOCATE(neighbor_cell_index)
   DEALLOCATE(clat)
   DEALLOCATE(clon)
   DEALLOCATE(lat)
