@@ -27,11 +27,11 @@ program ecrad_ml
   !integer,parameter :: batch_size = 81919
   !integer,parameter :: batch_size = 81920
 
-  ! character(100), parameter :: input_2d_name = "serving_default_input_22"
-  ! character(100), parameter :: input_3d_name = "serving_default_input_23"
-  character(100), parameter :: input_2d_name = "serving_default_input_2d"
-  character(100), parameter :: input_3d_name = "serving_default_input_3d"
-  character(100), parameter :: output_2d_name = "StatefulPartitionedCall"
+  ! character(100), parameter :: input_tensor_name_2d = "serving_default_input_22"
+  ! character(100), parameter :: input_tensor_name_3d = "serving_default_input_23"
+  character(100), parameter :: input_tensor_name_2d = "serving_default_input_2d"
+  character(100), parameter :: input_tensor_name_3d = "serving_default_input_3d"
+  character(100), parameter :: output_tensor_name = "StatefulPartitionedCall"
 
   integer, parameter :: nsteps = 4
   integer, parameter :: nflxs = 4
@@ -215,9 +215,9 @@ program ecrad_ml
   ! init tensor sets
   call infero_check(iset%initialise())
   call infero_check(oset%initialise())
-  call infero_check(iset%push_tensor(input_3d, input_2d_name))
-  call infero_check(iset%push_tensor(input_2d, input_3d_name))
-  call infero_check(oset%push_tensor(pred_flx, output_2d_name))
+  call infero_check(iset%push_tensor(input_3d, trim(input_tensor_name_3d)))
+  call infero_check(iset%push_tensor(input_2d, trim(input_tensor_name_2d)))
+  call infero_check(oset%push_tensor(pred_flx, trim(output_tensor_name)))
 
   ! TIMESTEP
   write(*,'(a)') 'run model'
